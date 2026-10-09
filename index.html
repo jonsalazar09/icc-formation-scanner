@@ -1,466 +1,52 @@
-
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ICC Music Ministry Formation 2026 | QR Check-In</title>
-
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-
 <style>
-* { box-sizing: border-box; }
-
-body {
-  font-family: system-ui, -apple-system, Arial, sans-serif;
-  background: #f5f3f6;
-  color: #24202a;
-  margin: 0;
-  padding: 16px;
-}
-
-main {
-  max-width: 480px;
-  margin: auto;
-  background: #fff;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 4px 20px #0001;
-}
-
-h1 {
-  color: #60243d;
-  font-size: 24px;
-  margin: 0 0 5px;
-}
-
-.sub {
-  color: #666;
-  margin-bottom: 18px;
-}
-
-label {
-  display: block;
-  font-weight: 600;
-  margin-top: 14px;
-}
-
-input, button {
-  width: 100%;
-  font-size: 16px;
-  padding: 13px;
-  border-radius: 9px;
-  margin: 6px 0;
-}
-
-input { border: 1px solid #bbb; }
-
-button {
-  background: #60243d;
-  color: #fff;
-  border: 0;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-button.secondary { background: #37445a; }
-button:disabled { opacity: .5; cursor: default; }
-
-#reader {
-  width: 100%;
-  margin: 12px auto;
-  overflow: hidden;
-}
-
-#result {
-  padding: 14px;
-  border-radius: 10px;
-  margin-top: 14px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  background: #f0eef0;
-}
-
-#result.ok {
-  background: #e2f4e8;
-  color: #18552c;
-}
-
-#result.bad {
-  background: #ffe3e3;
-  color: #862222;
-}
-
-small {
-  display: block;
-  color: #777;
-  margin-top: 14px;
-  line-height: 1.5;
-}
+*{box-sizing:border-box}body{font-family:system-ui,-apple-system,Arial,sans-serif;background:#f5f3f6;color:#24202a;margin:0;padding:16px}main{max-width:480px;margin:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px #0001}h1{color:#60243d;font-size:24px;margin:0 0 5px}.sub{color:#666;margin-bottom:18px}label{display:block;font-weight:600;margin-top:14px}input,button{width:100%;font-size:16px;padding:13px;border-radius:9px;margin:6px 0}input{border:1px solid #bbb}button{background:#60243d;color:#fff;border:0;font-weight:600}button.secondary{background:#37445a}button:disabled{opacity:.5}#reader{width:100%;margin:12px auto;overflow:hidden}#result{padding:14px;border-radius:10px;margin-top:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0eef0}#result.ok{background:#e2f4e8;color:#18552c}#result.bad{background:#ffe3e3;color:#862222}small{display:block;color:#777;margin-top:14px;line-height:1.5}
 </style>
 </head>
-
-<body>
-<main>
-
-<h1>ICC Music Ministry Formation 2026</h1>
-<div class="sub">Participant QR Attendance Check-In</div>
-
-<label for="scanner">Volunteer / Registration Desk</label>
-<input
-  id="scanner"
-  placeholder="e.g., Desk 1 - Maria"
-  maxlength="80"
->
-
-<button id="start" type="button">
-  Start Camera Scanner
-</button>
-
-<button id="stop" class="secondary" type="button" disabled>
-  Stop Camera
-</button>
-
+<body><main>
+<h1>ICC Music Ministry Formation 2026</h1><div class="sub">Participant QR Attendance Check-In</div>
+<label for="scanner">Volunteer / Registration Desk</label><input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80">
+<button id="start" type="button">Start Camera Scanner</button><button id="stop" class="secondary" type="button" disabled>Stop Camera</button>
 <div id="reader"></div>
-
-<label for="manual">Manual Registration ID</label>
-<input
-  id="manual"
-  placeholder="ICC26-00001"
-  autocapitalize="characters"
-  autocomplete="off"
-  spellcheck="false"
->
-
-<button id="submit" type="button">
-  Check In ID
-</button>
-
-<div id="result" role="status" aria-live="polite">
-  Ready to scan.
-</div>
-
-<small>
-  ICC Music Ministry Formation 2026.
-  After checking in a participant, tap Back to Scanner,
-  then tap Start Camera Scanner for the next participant.
-</small>
-
+<label for="manual">Manual Registration ID</label><input id="manual" placeholder="ICC26-00001" autocapitalize="characters" autocomplete="off" spellcheck="false">
+<button id="submit" type="button">Check In ID</button>
+<div id="result" role="status" aria-live="polite">Ready to scan.</div>
+<small>After checking in, tap Back to Scanner. If Safari restores the old page, tap the Reload Scanner button below before scanning again.</small>
+<button id="reload" class="secondary" type="button">Reload Scanner (iPhone)</button>
 </main>
-
-<form
-  id="checkinForm"
-  method="POST"
-  action="https://script.google.com/macros/s/AKfycbzqKzKaVYE-4eRYYRkWeT-MsObHidVp_CgpJlYRvIkfoJlS2yIAACmu9x2dC9JOqWsO/exec"
-  accept-charset="UTF-8"
-  style="display:none"
->
-  <input name="registrationId" id="formId">
-  <input name="scannerName" id="formScanner">
+<form id="checkinForm" method="POST" action="https://script.google.com/macros/s/AKfycbzqKzKaVYE-4eRYYRkWeT-MsObHidVp_CgpJlYRvIkfoJlS2yIAACmu9x2dC9JOqWsO/exec" accept-charset="UTF-8" style="display:none">
+<input name="registrationId" id="formId"><input name="scannerName" id="formScanner">
 </form>
-
 <script>
-const el = id => document.getElementById(id);
-
-let qr = null;
-let scanning = false;
-let starting = false;
-let submitting = false;
-let stopping = null;
-let scanHandled = false;
-let session = 0;
-
-function show(message, cls = '') {
-  el('result').className = cls;
-  el('result').textContent = message;
-}
-
-function updateButtons() {
-  el('start').disabled =
-    starting || scanning || submitting || !!stopping;
-
-  el('stop').disabled =
-    !scanning || starting || submitting || !!stopping;
-
-  el('submit').disabled = submitting;
-}
-
-function saveVolunteer() {
-  const name = el('scanner').value.trim() || 'Mobile volunteer';
-  sessionStorage.setItem('iccScannerName', name);
-  return name;
-}
-
-function getRegistrationId(raw) {
-  const match = String(raw || '')
-    .toUpperCase()
-    .match(/ICC26-\d{5,}/);
-
-  return match ? match[0] : null;
-}
-
-async function releaseCamera() {
-  if (stopping) return stopping;
-
-  const instance = qr;
-
-  if (!instance) {
-    scanning = false;
-    starting = false;
-    updateButtons();
-    return;
-  }
-
-  stopping = (async () => {
-    try {
-      if (scanning || starting) {
-        try {
-          await instance.stop();
-        } catch (_) {}
-      }
-
-      try {
-        instance.clear();
-      } catch (_) {}
-
-    } finally {
-      if (qr === instance) qr = null;
-      scanning = false;
-      starting = false;
-    }
-  })();
-
-  updateButtons();
-
-  try {
-    await stopping;
-  } finally {
-    stopping = null;
-    updateButtons();
-  }
-}
-
-async function submitId(raw) {
-  if (submitting || scanHandled) return;
-
-  const id = getRegistrationId(raw);
-
-  if (!id) {
-    show(
-      'QR code does not contain a valid ICC26 registration ID.',
-      'bad'
-    );
-    return;
-  }
-
-  scanHandled = true;
-  submitting = true;
-  session++;
-  updateButtons();
-
-  show('Processing check-in for ' + id + '…');
-
-  el('formId').value = id;
-  el('formScanner').value = saveVolunteer();
-
-  await releaseCamera();
-
-  el('checkinForm').submit();
-}
-
-async function startScan() {
-  if (starting || scanning || submitting || stopping) return;
-
-  starting = true;
-  scanHandled = false;
-
-  const currentSession = ++session;
-
-  updateButtons();
-  show('Requesting camera access…');
-
-  try {
-    if (typeof Html5Qrcode === 'undefined') {
-      throw new Error('Scanner library failed to load.');
-    }
-
-    if (!window.isSecureContext) {
-      throw new Error(
-        'Open the HTTPS GitHub Pages link in Safari or Chrome.'
-      );
-    }
-
-    if (qr) {
-      try {
-        await qr.stop();
-      } catch (_) {}
-
-      try {
-        qr.clear();
-      } catch (_) {}
-
-      qr = null;
-    }
-
-    const instance = new Html5Qrcode('reader', {
-      verbose: false
-    });
-
-    qr = instance;
-
-    const config = {
-      fps: 10,
-      qrbox: { width: 220, height: 220 }
-    };
-
-    const onSuccess = decodedText => {
-      if (
-        currentSession !== session ||
-        scanHandled ||
-        submitting
-      ) return;
-
-      submitId(decodedText);
-    };
-
-    await instance.start(
-      { facingMode: 'environment' },
-      config,
-      onSuccess,
-      () => {}
-    );
-
-    if (currentSession !== session) {
-      try {
-        await instance.stop();
-      } catch (_) {}
-
-      try {
-        instance.clear();
-      } catch (_) {}
-
-      if (qr === instance) qr = null;
-      return;
-    }
-
-    scanning = true;
-    show(
-      'Camera ready. Point at a participant QR code.',
-      'ok'
-    );
-
-  } catch (err) {
-    const message = err?.message || String(err);
-
-    if (currentSession === session) {
-      show(
-        'Camera unavailable: ' + message +
-        '\n\nTap Start Camera Scanner to try again, ' +
-        'or use Manual Registration ID.',
-        'bad'
-      );
-    }
-
-    if (qr) {
-      try {
-        qr.clear();
-      } catch (_) {}
-      qr = null;
-    }
-
-    scanning = false;
-
-  } finally {
-    starting = false;
-    updateButtons();
-  }
-}
-
-async function stopScan() {
-  if (!qr || submitting) return;
-
-  session++;
-  await releaseCamera();
-
-  scanHandled = false;
-  show('Camera stopped. Tap Start Camera Scanner to resume.');
-  updateButtons();
-}
-
-function resetAfterReturn() {
-  session++;
-  submitting = false;
-  scanHandled = false;
-  starting = false;
-  scanning = false;
-  stopping = null;
-
-  const old = qr;
-  qr = null;
-
-  if (old) {
-    try {
-      const promise = old.stop();
-      if (promise && typeof promise.catch === 'function') {
-        promise.catch(() => {});
-      }
-    } catch (_) {}
-
-    try {
-      old.clear();
-    } catch (_) {}
-  }
-
-  el('reader').innerHTML = '';
-  el('manual').value = '';
-
-  el('scanner').value =
-    sessionStorage.getItem('iccScannerName') || '';
-
-  show(
-    'Ready for the next participant. Tap Start Camera Scanner.',
-    'ok'
-  );
-
-  updateButtons();
-}
-
-el('start').addEventListener('click', startScan);
-
-el('stop').addEventListener('click', stopScan);
-
-el('submit').addEventListener('click', () => {
-  submitId(el('manual').value);
-});
-
-el('manual').addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    submitId(el('manual').value);
-  }
-});
-
-el('scanner').addEventListener('change', saveVolunteer);
-
-window.addEventListener('pageshow', event => {
-  if (event.persisted) {
-    resetAfterReturn();
-  } else {
-    submitting = false;
-    scanHandled = false;
-    updateButtons();
-  }
-});
-
-window.addEventListener('pagehide', () => {
-  saveVolunteer();
-});
-
-el('scanner').value =
-  sessionStorage.getItem('iccScannerName') || '';
-
-updateButtons();
-</script>
-
-</body>
-</html>
+const el=id=>document.getElementById(id);
+let qr=null, scanning=false, starting=false, submitting=false, stopping=null, handled=false, generation=0;
+function show(message,kind=''){el('result').className=kind;el('result').textContent=message;}
+function buttons(){el('start').disabled=starting||scanning||submitting||!!stopping;el('stop').disabled=!scanning||starting||submitting||!!stopping;el('submit').disabled=submitting;}
+function saveVolunteer(){const name=el('scanner').value.trim()||'Mobile volunteer';try{sessionStorage.setItem('iccScannerName',name);}catch(_){}return name;}
+function parseId(raw){const match=String(raw||'').toUpperCase().match(/ICC26-\d{5,}/);return match?match[0]:null;}
+async function dispose(instance){if(!instance)return;try{await instance.stop();}catch(_){}try{instance.clear();}catch(_){} }
+async function release(){if(stopping)return stopping;const instance=qr;qr=null;scanning=false;stopping=dispose(instance);buttons();try{await stopping;}finally{stopping=null;buttons();}}
+async function submitId(raw){if(submitting||handled)return;const id=parseId(raw);if(!id){show('Invalid QR code. Expected an ICC26 registration ID.','bad');return;}handled=true;submitting=true;generation++;buttons();show('Recording attendance for '+id+'…');el('formId').value=id;el('formScanner').value=saveVolunteer();await release(); // Allow Safari to release the capture session before navigation.
+await new Promise(resolve=>setTimeout(resolve,350));el('checkinForm').submit();}
+async function startScan(){if(starting||scanning||submitting||stopping)return;starting=true;handled=false;const token=++generation;buttons();show('Requesting camera access…');let instance=null;
+try{if(typeof Html5Qrcode==='undefined')throw Error('QR scanner library could not load.');if(!window.isSecureContext)throw Error('Open the HTTPS scanner URL directly in Safari.');
+instance=new Html5Qrcode('reader',{verbose:false});qr=instance;await instance.start({facingMode:'environment'},{fps:10,qrbox:{width:220,height:220}},decoded=>{if(token===generation&&!handled&&!submitting)void submitId(decoded);},()=>{});
+if(token!==generation){await dispose(instance);return;}scanning=true;show('Camera ready. Point at a participant QR code.','ok');}
+catch(error){if(token===generation){show('Camera unavailable: '+(error.message||String(error))+'\nOn iPhone, tap Reload Scanner and then Start Camera Scanner.','bad');}await dispose(instance);if(qr===instance)qr=null;scanning=false;}
+finally{starting=false;buttons();}}
+async function stopScan(){if(submitting)return;generation++;await release();handled=false;show('Camera stopped. Tap Start Camera Scanner to resume.');}
+function freshReload(){saveVolunteer();window.location.replace(window.location.pathname+'?fresh='+Date.now());}
+el('start').addEventListener('click',()=>void startScan());el('stop').addEventListener('click',()=>void stopScan());el('submit').addEventListener('click',()=>void submitId(el('manual').value));el('manual').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void submitId(el('manual').value);}});el('scanner').addEventListener('change',saveVolunteer);el('reload').addEventListener('click',freshReload);
+try{el('scanner').value=sessionStorage.getItem('iccScannerName')||'';}catch(_){}
+window.addEventListener('pageshow',e=>{if(e.persisted){ // Avoid trying to restart an old iOS capture session.
+ saveVolunteer();window.location.replace(window.location.pathname+'?fresh='+Date.now());
+}});
+window.addEventListener('pagehide',()=>{saveVolunteer();generation++;if(qr){const old=qr;qr=null;void dispose(old);}});
+buttons();
+</script></body></html>
