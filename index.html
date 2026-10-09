@@ -2,51 +2,100 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ICC Music Ministry Formation 2026 | QR Check-In</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ICC Music Ministry Formation 2026 | QR Attendance</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-*{box-sizing:border-box}body{font-family:system-ui,-apple-system,Arial,sans-serif;background:#f5f3f6;color:#24202a;margin:0;padding:16px}main{max-width:480px;margin:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px #0001}h1{color:#60243d;font-size:24px;margin:0 0 5px}.sub{color:#666;margin-bottom:18px}label{display:block;font-weight:600;margin-top:14px}input,button{width:100%;font-size:16px;padding:13px;border-radius:9px;margin:6px 0}input{border:1px solid #bbb}button{background:#60243d;color:#fff;border:0;font-weight:600}button.secondary{background:#37445a}button:disabled{opacity:.5}#reader{width:100%;margin:12px auto;overflow:hidden}#result{padding:14px;border-radius:10px;margin-top:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0eef0}#result.ok{background:#e2f4e8;color:#18552c}#result.bad{background:#ffe3e3;color:#862222}small{display:block;color:#777;margin-top:14px;line-height:1.5}
+*{box-sizing:border-box}body{font-family:system-ui,-apple-system,Arial,sans-serif;background:#f5f3f6;color:#24202a;margin:0;padding:16px}main{max-width:480px;margin:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px #0001}h1{color:#60243d;font-size:24px;margin:0 0 5px}.sub{color:#666;margin-bottom:18px}label{display:block;font-weight:600;margin-top:14px}input,button{width:100%;font-size:16px;padding:13px;border-radius:9px;margin:6px 0}input{border:1px solid #bbb}button{background:#60243d;color:#fff;border:0;font-weight:600}button.secondary{background:#37445a}button:disabled{opacity:.5}#reader{width:100%;margin:12px auto;overflow:hidden}#result{padding:14px;border-radius:10px;margin-top:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0eef0}#result.ok{background:#e2f4e8;color:#18552c}#result.warn{background:#fff1d9;color:#734700}#result.bad{background:#ffe3e3;color:#862222}small{display:block;color:#777;margin-top:14px;line-height:1.5}
 </style>
 </head>
 <body><main>
-<h1>ICC Music Ministry Formation 2026</h1><div class="sub">Participant QR Attendance Check-In</div>
-<label for="scanner">Volunteer / Registration Desk</label><input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80">
-<button id="start" type="button">Start Camera Scanner</button><button id="stop" class="secondary" type="button" disabled>Stop Camera</button>
+<h1>ICC Music Ministry Formation 2026</h1>
+<div class="sub">Continuous Participant QR Attendance Check-In</div>
+<label for="scanner">Volunteer / Registration Desk</label>
+<input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80">
+<button id="start" type="button">Start Camera Scanner</button>
+<button id="stop" type="button" class="secondary" disabled>Stop Camera</button>
 <div id="reader"></div>
-<label for="manual">Manual Registration ID</label><input id="manual" placeholder="ICC26-00001" autocapitalize="characters" autocomplete="off" spellcheck="false">
+<label for="manual">Manual Registration ID</label>
+<input id="manual" placeholder="ICC26-00001" autocapitalize="characters" autocomplete="off" spellcheck="false">
 <button id="submit" type="button">Check In ID</button>
 <div id="result" role="status" aria-live="polite">Ready to scan.</div>
-<small>After checking in, tap Back to Scanner. If Safari restores the old page, tap the Reload Scanner button below before scanning again.</small>
-<button id="reload" class="secondary" type="button">Reload Scanner (iPhone)</button>
+<small>Stay on this page to scan the next participant. Attendance results appear above. A volunteer should use a trusted device and keep this link private.</small>
 </main>
-<form id="checkinForm" method="POST" action="https://script.google.com/macros/s/AKfycbzqKzKaVYE-4eRYYRkWeT-MsObHidVp_CgpJlYRvIkfoJlS2yIAACmu9x2dC9JOqWsO/exec" accept-charset="UTF-8" style="display:none">
-<input name="registrationId" id="formId"><input name="scannerName" id="formScanner">
-</form>
 <script>
+'use strict';
+// Keep this URL in sync with the currently deployed Apps Script web app.
+const ENDPOINT='https://script.google.com/macros/s/AKfycbzqKzKaVYE-4eRYYRkWeT-MsObHidVp_CgpJlYRvIkfoJlS2yIAACmu9x2dC9JOqWsO/exec';
 const el=id=>document.getElementById(id);
-let qr=null, scanning=false, starting=false, submitting=false, stopping=null, handled=false, generation=0;
-function show(message,kind=''){el('result').className=kind;el('result').textContent=message;}
-function buttons(){el('start').disabled=starting||scanning||submitting||!!stopping;el('stop').disabled=!scanning||starting||submitting||!!stopping;el('submit').disabled=submitting;}
-function saveVolunteer(){const name=el('scanner').value.trim()||'Mobile volunteer';try{sessionStorage.setItem('iccScannerName',name);}catch(_){}return name;}
-function parseId(raw){const match=String(raw||'').toUpperCase().match(/ICC26-\d{5,}/);return match?match[0]:null;}
-async function dispose(instance){if(!instance)return;try{await instance.stop();}catch(_){}try{instance.clear();}catch(_){} }
-async function release(){if(stopping)return stopping;const instance=qr;qr=null;scanning=false;stopping=dispose(instance);buttons();try{await stopping;}finally{stopping=null;buttons();}}
-async function submitId(raw){if(submitting||handled)return;const id=parseId(raw);if(!id){show('Invalid QR code. Expected an ICC26 registration ID.','bad');return;}handled=true;submitting=true;generation++;buttons();show('Recording attendance for '+id+'…');el('formId').value=id;el('formScanner').value=saveVolunteer();await release(); // Allow Safari to release the capture session before navigation.
-await new Promise(resolve=>setTimeout(resolve,350));el('checkinForm').submit();}
-async function startScan(){if(starting||scanning||submitting||stopping)return;starting=true;handled=false;const token=++generation;buttons();show('Requesting camera access…');let instance=null;
-try{if(typeof Html5Qrcode==='undefined')throw Error('QR scanner library could not load.');if(!window.isSecureContext)throw Error('Open the HTTPS scanner URL directly in Safari.');
-instance=new Html5Qrcode('reader',{verbose:false});qr=instance;await instance.start({facingMode:'environment'},{fps:10,qrbox:{width:220,height:220}},decoded=>{if(token===generation&&!handled&&!submitting)void submitId(decoded);},()=>{});
-if(token!==generation){await dispose(instance);return;}scanning=true;show('Camera ready. Point at a participant QR code.','ok');}
-catch(error){if(token===generation){show('Camera unavailable: '+(error.message||String(error))+'\nOn iPhone, tap Reload Scanner and then Start Camera Scanner.','bad');}await dispose(instance);if(qr===instance)qr=null;scanning=false;}
-finally{starting=false;buttons();}}
-async function stopScan(){if(submitting)return;generation++;await release();handled=false;show('Camera stopped. Tap Start Camera Scanner to resume.');}
-function freshReload(){saveVolunteer();window.location.replace(window.location.pathname+'?fresh='+Date.now());}
-el('start').addEventListener('click',()=>void startScan());el('stop').addEventListener('click',()=>void stopScan());el('submit').addEventListener('click',()=>void submitId(el('manual').value));el('manual').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void submitId(el('manual').value);}});el('scanner').addEventListener('change',saveVolunteer);el('reload').addEventListener('click',freshReload);
+let qr=null,scanning=false,starting=false,busy=false,pending=null,lastId='',lastAt=0;
+const show=(message,cls='')=>{el('result').className=cls;el('result').textContent=message;};
+function buttons(){el('start').disabled=starting||scanning;el('stop').disabled=!scanning||starting;el('submit').disabled=busy;}
+function volunteer(){const name=el('scanner').value.trim()||'Mobile volunteer';try{sessionStorage.setItem('iccScannerName',name);}catch(_){}return name;}
+function parseId(raw){const m=String(raw||'').toUpperCase().match(/ICC26-\d{5,}/);return m?m[0]:null;}
+function resumeCamera(){if(qr&&scanning){try{qr.resume();}catch(_){} }}
+function receiveResult(data){
+ if(!pending||!data||data.requestId!==pending.id)return;
+ const req=pending;pending=null;clearTimeout(req.timeout);req.script.remove();busy=false;
+ const r=data.result||{};
+ const dup=Boolean(r.duplicate)||/already checked|duplicate/i.test(String(r.message||''));
+ const cls=r.ok?'ok':dup?'warn':'bad';
+ show((r.ok?'✓ Checked in':dup?'! Already checked in':'✕ Check-in not completed')+'\n'+(r.name||'')+'\n'+(r.message||'')+(r.time?'\n'+r.time:''),cls);
+ buttons();
+ // Keep the camera open; after a short pause, resume decoding.
+ setTimeout(resumeCamera,1700);
+}
+window.iccReceiveCheckIn=receiveResult;
+function checkIn(raw){
+ if(busy)return;
+ const id=parseId(raw);
+ if(!id){show('Invalid QR or registration ID. Expected ICC26-00001 format.','bad');return;}
+ const now=Date.now();if(id===lastId&&now-lastAt<3000)return;
+ lastId=id;lastAt=now;busy=true;buttons();
+ if(qr&&scanning){try{qr.pause(true);}catch(_){}}
+ show('Checking in '+id+'…');
+ const requestId=String(now)+'_'+Math.random().toString(36).slice(2);
+ const script=document.createElement('script');
+ const query=new URLSearchParams({action:'checkin',registrationId:id,scannerName:volunteer(),requestId:requestId});
+ const timeout=setTimeout(()=>{
+   if(!pending||pending.id!==requestId)return;
+   pending=null;script.remove();busy=false;buttons();
+   show('No confirmation received. Check Attendance Log before trying this ID again; the check-in may have been recorded.','bad');
+   resumeCamera();
+ },20000);
+ pending={id:requestId,script,timeout};
+ script.onerror=()=>{
+   if(!pending||pending.id!==requestId)return;
+   clearTimeout(timeout);pending=null;script.remove();busy=false;buttons();
+   show('Could not reach Apps Script. Confirm the latest web app deployment is public and supports doGet. Check Attendance Log before retrying.','bad');
+   resumeCamera();
+ };
+ script.src=ENDPOINT+'?'+query.toString();
+ document.head.appendChild(script);
+}
+async function startScan(){
+ if(starting||scanning)return;starting=true;buttons();show('Requesting camera access…');
+ try{
+  if(!window.isSecureContext)throw Error('Open the HTTPS scanner address in Safari or Chrome.');
+  if(typeof Html5Qrcode==='undefined')throw Error('Scanner library did not load.');
+  qr=new Html5Qrcode('reader',{verbose:false});
+  await qr.start({facingMode:'environment'},{fps:10,qrbox:(w,h)=>{const size=Math.min(220,w-24,h-24);return{width:size,height:size};}},decoded=>checkIn(decoded),()=>{});
+  scanning=true;show('Camera ready. Point at a participant QR code.','ok');
+ }catch(err){show('Camera unavailable: '+(err.message||String(err))+'\nUse Manual Registration ID if needed.','bad');if(qr){try{qr.clear();}catch(_){}}qr=null;scanning=false;}
+ finally{starting=false;buttons();}
+}
+async function stopScan(){
+ if(!qr||!scanning)return;
+ try{await qr.stop();qr.clear();qr=null;scanning=false;show('Camera stopped.');}
+ catch(err){show('Could not stop camera: '+String(err),'bad');}
+ buttons();
+}
+el('start').addEventListener('click',startScan);
+el('stop').addEventListener('click',stopScan);
+el('submit').addEventListener('click',()=>checkIn(el('manual').value));
+el('manual').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();checkIn(el('manual').value);}});
+el('scanner').addEventListener('change',volunteer);
 try{el('scanner').value=sessionStorage.getItem('iccScannerName')||'';}catch(_){}
-window.addEventListener('pageshow',e=>{if(e.persisted){ // Avoid trying to restart an old iOS capture session.
- saveVolunteer();window.location.replace(window.location.pathname+'?fresh='+Date.now());
-}});
-window.addEventListener('pagehide',()=>{saveVolunteer();generation++;if(qr){const old=qr;qr=null;void dispose(old);}});
 buttons();
-</script></body></html>
+</script>
+</body></html>
