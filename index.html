@@ -43,13 +43,36 @@ function sendCheckIn(raw){
   // If the network fails, reset manually by refreshing; do not silently retry check-in.
  }catch(e){status(errorText(e));}
 }
-window.addEventListener('message',event=>{
- if(!pending || !event.data || event.data.type!=='ICC_CHECKIN_RESPONSE' || event.data.requestId!==pending)return;
- // The requestId is a correlation value, not authentication; validate the Apps Script sender origin.
- if(event.origin!=='https://script.google.com' && event.origin!=='https://script.googleusercontent.com')return;
- pending=null;busy=false;el('submit').disabled=false;
- const r=event.data.result||{};
- status((r.ok?'✓ ':r.duplicate?'Already checked in: ':'✕ ')+(r.name||'')+'\n'+(r.message||'Unknown response')+(r.time?'\n'+r.time:''));
+window.addEventListener('message', event => {
+  if (
+    !pending ||
+    !event.data ||
+    event.data.type !== 'ICC_CHECKIN_RESPONSE' ||
+    event.data.requestId !== pending
+  ) return;
+
+  // Accept only Google Apps Script response origins.
+  const allowed =
+    event.origin === 'https://script.google.com' ||
+    (
+      event.origin.startsWith('https://') &&
+      new URL(event.origin).hostname.endsWith('.googleusercontent.com')
+    );
+
+  if (!allowed) return;
+
+  pending = null;
+  busy = false;
+  el('submit').disabled = false;
+
+  const r = event.data.result || {};
+
+  status(
+    (r.ok ? '✓ ' : r.duplicate ? 'Already checked in: ' : '✕ ') +
+    (r.name || '') + '\n' +
+    (r.message || 'Unknown response') +
+    (r.time ? '\n' + r.time : '')
+  );
 });
 async function startCamera(){
  try{
