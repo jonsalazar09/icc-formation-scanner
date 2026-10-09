@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ICC Formation 2026 — QR Check-In</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f3f5;color:#27212a;margin:0}main{max-width:520px;margin:auto;padding:20px}h1{color:#60243d;font-size:1.5rem}.panel{background:white;border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 2px 10px #0001}label{display:block;margin:12px 0 5px;font-weight:600}input{box-sizing:border-box;width:100%;font-size:17px;padding:12px;border:1px solid #bcb5c0;border-radius:8px}button{border:0;background:#60243d;color:white;border-radius:9px;padding:12px 15px;font-size:16px;margin:9px 6px 0 0}button.secondary{background:#34445b}button:disabled{opacity:.55}#reader{width:100%}#status{white-space:pre-wrap;line-height:1.5}small{color:#645e69}
+</style></head><body><main>
+<h1>ICC Formation 2026</h1><p>Volunteer QR Attendance Scanner</p>
+<section class="panel"><label for="pin">6-digit volunteer PIN</label><input id="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Enter PIN"><label for="desk">Scanner / volunteer name</label><input id="desk" maxlength="35" placeholder="Registration Desk 1"></section>
+<section class="panel"><h2>Scan QR code</h2><div id="reader"></div><button id="start" onclick="startCamera()">Start camera</button><button class="secondary" onclick="stopCamera()">Stop camera</button><p><small>Open this page directly in Safari (iPhone) or Chrome (Android) and allow camera access.</small></p></section>
+<section class="panel"><h2>Manual check-in</h2><label for="id">Registration ID</label><input id="id" placeholder="ICC26-00001" autocapitalize="characters"><button id="submit" onclick="manualCheckIn()">Check in</button></section>
+<section class="panel"><strong>Result</strong><p id="status" role="status" aria-live="polite">Ready.</p></section>
+<iframe name="iccTarget" id="iccTarget" style="display:none" title="Check-in response"></iframe>
+<form id="iccForm" method="POST" target="iccTarget" style="display:none"><input name="requestId"><input name="registrationId"><input name="scannerName"><input name="pin"></form>
+<script>
+// REPLACE with the /exec URL from the Apps Script deployment that contains the PIN backend.
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqKzKaVYE-4eRYYRkWeT-MsObHidVp_CgpJlYRvIkfoJlS2yIAACmu9x2dC9JOqWsO/exec';
+let qr=null, busy=false, lastScan='', lastScanAt=0, pending=null;
+const el=id=>document.getElementById(id);
+function status(message){el('status').textContent=message;}
+function errorText(e){return (e && (e.message || e.name)) || String(e || 'Unknown error');}
+function validate(){
+ const pin=el('pin').value.trim();
+ if(!/^\d{6}$/.test(pin))throw Error('Enter the 6-digit volunteer PIN.');
+ if(!/^https:\/\/.+\/exec(?:\?.*)?$/.test(APPS_SCRIPT_URL))throw Error('Configure APPS_SCRIPT_URL in Scanner.html first.');
+ return pin;
+}
+function manualCheckIn(){sendCheckIn(el('id').value);}
+function sendCheckIn(raw){
+ if(busy)return;
+ try{
+  const pin=validate(), id=String(raw||'').trim().toUpperCase();
+  if(!/^ICC26-\d{5,}$/.test(id))throw Error('QR code must contain a valid ICC26- registration ID.');
+  busy=true;el('submit').disabled=true;
+  const requestId=String(Date.now())+'-'+Math.random().toString(36).slice(2);
+  pending=requestId;
+  const form=el('iccForm');form.action=APPS_SCRIPT_URL;
+  form.elements.namedItem('requestId').value=requestId;
+  form.elements.namedItem('registrationId').value=id;
+  form.elements.namedItem('scannerName').value=el('desk').value.trim()||'Registration Desk';
+  form.elements.namedItem('pin').value=pin;
+  status('Checking in '+id+'…');form.submit();
+  // If the network fails, reset manually by refreshing; do not silently retry check-in.
+ }catch(e){status(errorText(e));}
+}
+window.addEventListener('message',event=>{
+ if(!pending || !event.data || event.data.type!=='ICC_CHECKIN_RESPONSE' || event.data.requestId!==pending)return;
+ // The requestId is a correlation value, not authentication; validate the Apps Script sender origin.
+ if(event.origin!=='https://script.google.com' && event.origin!=='https://script.googleusercontent.com')return;
+ pending=null;busy=false;el('submit').disabled=false;
+ const r=event.data.result||{};
+ status((r.ok?'✓ ':r.duplicate?'Already checked in: ':'✕ ')+(r.name||'')+'\n'+(r.message||'Unknown response')+(r.time?'\n'+r.time:''));
+});
+async function startCamera(){
+ try{
+  validate();if(qr)return;
+  if(!window.isSecureContext)throw Error('Scanner requires an HTTPS website.');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)throw Error('Camera API unavailable. Open in Safari or Chrome.');
+  qr=new Html5Qrcode('reader',{verbose:false});
+  const config={fps:10,qrbox:(w,h)=>{const s=Math.min(250,Math.floor(Math.min(w,h)*.8));return {width:s,height:s};}};
+  const onScan=text=>{const now=Date.now();if(text===lastScan&&now-lastScanAt<4000)return;lastScan=text;lastScanAt=now;sendCheckIn(text);};
+  try{await qr.start({facingMode:'environment'},config,onScan,()=>{});}
+  catch(first){
+   const cameras=await Html5Qrcode.getCameras();
+   if(!cameras.length)throw first;
+   const preferred=cameras.find(c=>/back|rear|environment/i.test(c.label))||cameras[cameras.length-1];
+   await qr.start(preferred.id,config,onScan,()=>{});
+  }
+  status('Camera ready. Point it at a participant QR code.');
+ }catch(e){status('Camera could not start: '+errorText(e));if(qr){try{await qr.clear();}catch(_){}qr=null;}}
+}
+async function stopCamera(){if(!qr)return;try{await qr.stop();await qr.clear();}catch(e){status(errorText(e));}qr=null;status('Camera stopped.');}
+</script></main></body></html>
