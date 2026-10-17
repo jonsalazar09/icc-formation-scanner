@@ -1,9 +1,9 @@
-
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#60243d">
 <title>ICC Music Ministry Formation 2026 | QR Attendance</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
@@ -15,15 +15,15 @@ h1{color:#60243d;font-size:24px;margin:0 0 5px}
 label{display:block;font-weight:600;margin-top:14px}
 input,button{width:100%;font-size:16px;padding:13px;border-radius:9px;margin:6px 0}
 input{border:1px solid #bbb}
-button{background:#60243d;color:#fff;border:0;font-weight:600}
+button{background:#60243d;color:#fff;border:0;font-weight:600;cursor:pointer}
 button.secondary{background:#37445a}
-button:disabled{opacity:.5}
+button:disabled{opacity:.5;cursor:not-allowed}
 #reader{width:100%;margin:12px auto;overflow:hidden}
-#result{padding:14px;border-radius:10px;margin-top:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0eef0}
+#result{padding:14px;border-radius:10px;margin-top:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0eef0;line-height:1.55}
 #result.ok{background:#e2f4e8;color:#18552c}
 #result.warn{background:#fff1d9;color:#734700}
 #result.bad{background:#ffe3e3;color:#862222}
-
+#result.info{background:#e8edf8;color:#273d65}
 #participant{display:none;text-align:center;padding:16px 12px 4px;margin-top:12px;border:1px solid #e7e1e6;border-radius:12px;background:#fff}
 #participant.visible{display:block}
 #participantPhoto{display:none;width:180px;height:180px;max-width:100%;object-fit:cover;border-radius:12px;border:2px solid #e7e1e6;margin:0 auto 12px}
@@ -33,6 +33,9 @@ button:disabled{opacity:.5}
 #participantName{font-size:21px;font-weight:700;color:#60243d;overflow-wrap:anywhere}
 #participantId{font-size:13px;color:#777;margin-top:5px}
 #photoNote{font-size:12px;color:#777;margin-top:8px}
+#verify{display:none;margin-top:12px;padding:14px;border:1px solid #e2c78f;border-radius:10px;background:#fff8e9;color:#734700}
+#verify.visible{display:block}
+#verify button{margin-top:10px}
 small{display:block;color:#777;margin-top:14px;line-height:1.5}
 </style>
 </head>
@@ -63,22 +66,36 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
 
 <div id="result" role="status" aria-live="polite">Ready to scan.</div>
 
-<small>Stay on this page to scan the next participant. Attendance results appear above. A volunteer should use a trusted device and keep this link private.</small>
+<section id="verify" aria-live="polite">
+  <strong>Confirmation not received</strong>
+  <p>The request may have been recorded, but the scanner did not receive its confirmation. Check the Attendance Log before retrying this ID.</p>
+  <button id="verifyButton" type="button">I've checked the log — try again</button>
+</section>
+
+<small>Stay on this page to scan the next participant. If confirmation is uncertain, check the Attendance Log before retrying. Use a trusted device and keep this link private.</small>
 </main>
 
 <script>
 'use strict';
 
-// Keep this URL in sync with the currently deployed Apps Script web app.
 const ENDPOINT='https://script.google.com/macros/s/AKfycbzqKzKaVYE-4eRYYRkWeT-MsObHidVp_CgpJlYRvIkfoJlS2yIAACmu9x2dC9JOqWsO/exec';
 
 const el=id=>document.getElementById(id);
-let qr=null,scanning=false,starting=false,busy=false,pending=null,lastId='',lastAt=0;
 
-const show=(message,cls='')=>{
+let qr=null;
+let scanning=false;
+let starting=false;
+let busy=false;
+let pending=null;
+let lastId='';
+let lastAt=0;
+let uncertainId='';
+let requestSequence=0;
+
+function show(message,cls=''){
   el('result').className=cls;
   el('result').textContent=message;
-};
+}
 
 function buttons(){
   el('start').disabled=starting||scanning;
@@ -98,7 +115,7 @@ function parseId(raw){
 }
 
 function resumeCamera(){
-  if(qr&&scanning){
+  if(qr&&scanning&&!busy){
     try{qr.resume();}catch(_){}
   }
 }
@@ -119,11 +136,9 @@ function displayParticipant(r,registrationId){
   const placeholder=el('photoPlaceholder');
 
   panel.classList.add('visible');
-
   el('participantName').textContent=r.name||'Registered Participant';
   el('participantId').textContent=registrationId||'';
 
-  // The backend returns photoDataUrl when a photo is available.
   const photoUrl=typeof r.photoDataUrl==='string'?r.photoDataUrl:'';
 
   if(photoUrl.startsWith('data:image/')){
@@ -150,41 +165,91 @@ function displayParticipant(r,registrationId){
   }
 }
 
-function receiveResult(data){
-  if(!pending||!data||data.requestId!==pending.id)return;
+function finishRequest(req,data){
+  if(!pending||pending.id!==req.id)return;
 
-  const req=pending;
   pending=null;
   clearTimeout(req.timeout);
-  req.script.remove();
+  if(req.script)req.script.remove();
+
   busy=false;
+  uncertainId='';
+  el('verify').classList.remove('visible');
 
-  const r=data.result||{};
-  const dup=Boolean(r.duplicate)||/already checked|duplicate/i.test(String(r.message||''));
-  const cls=r.ok?'ok':dup?'warn':'bad';
+  const r=data&&data.result?data.result:{};
+  const message=String(r.message||'');
+  const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(message);
 
-  // Show participant details when returned by the backend.
-  if(r.name||r.photoDataUrl){
+  // The backend's checkIn() result determines success.
+  // Photo lookup errors must not turn a successful check-in into failure.
+  const success=r.ok===true;
+
+  if(r.name||r.photoDataUrl||r.photoMessage){
     displayParticipant(r,req.registrationId);
   }else{
     clearParticipant();
   }
 
-  show(
-    (r.ok?'✓ Checked in':dup?'! Already checked in':'✕ Check-in not completed')+
-    '\n'+(r.name||'')+
-    '\n'+(r.message||'')+
-    (r.time?'\n'+r.time:''),
-    cls
-  );
+  if(success){
+    show(
+      '✓ CHECK-IN SUCCESSFUL\n'+
+      (r.name||'Participant: '+req.registrationId)+
+      '\n'+message+
+      (r.time?'\n'+r.time:''),
+      'ok'
+    );
+  }else if(duplicate){
+    show(
+      '! ALREADY CHECKED IN\n'+
+      (r.name||'Participant: '+req.registrationId)+
+      '\n'+message,
+      'warn'
+    );
+  }else{
+    show(
+      '✕ CHECK-IN NOT COMPLETED\n'+
+      (r.name||'Participant: '+req.registrationId)+
+      '\n'+(message||'The server did not confirm the check-in.'),
+      'bad'
+    );
+  }
 
   buttons();
+  setTimeout(resumeCamera,1500);
+}
 
-  // Keep the camera open for the next participant.
-  setTimeout(resumeCamera,1700);
+function receiveResult(data){
+  if(!data)return;
+
+  // Ignore late responses from requests that have already timed out.
+  if(!pending||data.requestId!==pending.id)return;
+
+  finishRequest(pending,data);
 }
 
 window.iccReceiveCheckIn=receiveResult;
+
+function uncertain(req,reason){
+  if(!pending||pending.id!==req.id)return;
+
+  clearTimeout(req.timeout);
+  if(req.script)req.script.remove();
+
+  pending=null;
+  busy=false;
+  uncertainId=req.registrationId;
+
+  show(
+    reason+
+    '\nRegistration ID: '+req.registrationId+
+    '\nCheck the Attendance Log before trying this ID again.',
+    'bad'
+  );
+
+  el('verify').classList.add('visible');
+  buttons();
+  resumeCamera();
+}
 
 function checkIn(raw){
   if(busy)return;
@@ -193,6 +258,15 @@ function checkIn(raw){
 
   if(!id){
     show('Invalid QR or registration ID. Expected ICC26-00001 format.','bad');
+    return;
+  }
+
+  if(uncertainId){
+    show(
+      'Please check the Attendance Log for '+uncertainId+
+      ' before starting another check-in.',
+      'warn'
+    );
     return;
   }
 
@@ -209,11 +283,13 @@ function checkIn(raw){
   }
 
   clearParticipant();
-  show('Checking in '+id+'…');
+  el('verify').classList.remove('visible');
+  show('Sending check-in request for '+id+'…','info');
 
-  const requestId=String(now)+'_'+Math.random().toString(36).slice(2);
+  const requestId=String(now)+'_'+(++requestSequence)+'_'+
+    Math.random().toString(36).slice(2,10);
+
   const script=document.createElement('script');
-
   const query=new URLSearchParams({
     action:'checkin',
     registrationId:id,
@@ -221,46 +297,30 @@ function checkIn(raw){
     requestId:requestId
   });
 
-  const timeout=setTimeout(()=>{
-    if(!pending||pending.id!==requestId)return;
-
-    pending=null;
-    script.remove();
-    busy=false;
-    buttons();
-
-    show(
-      'No confirmation received. Check Attendance Log before trying this ID again; the check-in may have been recorded.',
-      'bad'
-    );
-
-    resumeCamera();
-  },20000);
-
-  pending={
+  const req={
     id:requestId,
     registrationId:id,
-    script,
-    timeout
+    script:script,
+    timeout:null
   };
+
+  pending=req;
+
+  req.timeout=setTimeout(()=>{
+    uncertain(
+      req,
+      'No confirmation was received before the request timed out.'
+    );
+  },30000);
 
   script.onerror=()=>{
-    if(!pending||pending.id!==requestId)return;
-
-    clearTimeout(timeout);
-    pending=null;
-    script.remove();
-    busy=false;
-    buttons();
-
-    show(
-      'Could not reach Apps Script. Confirm the latest web app deployment is public and supports doGet. Check Attendance Log before retrying.',
-      'bad'
+    uncertain(
+      req,
+      'The browser could not load the Apps Script response.'
     );
-
-    resumeCamera();
   };
 
+  // Install the callback before adding the request script.
   script.src=ENDPOINT+'?'+query.toString();
   document.head.appendChild(script);
 }
@@ -270,7 +330,7 @@ async function startScan(){
 
   starting=true;
   buttons();
-  show('Requesting camera access…');
+  show('Requesting camera access…','info');
 
   try{
     if(!window.isSecureContext){
@@ -288,7 +348,7 @@ async function startScan(){
       {
         fps:10,
         qrbox:(w,h)=>{
-          const size=Math.min(220,w-24,h-24);
+          const size=Math.max(100,Math.min(220,w-24,h-24));
           return{width:size,height:size};
         }
       },
@@ -307,7 +367,7 @@ async function startScan(){
     );
 
     if(qr){
-      try{qr.clear();}catch(_){}
+      try{await qr.clear();}catch(_){}
     }
 
     qr=null;
@@ -324,7 +384,7 @@ async function stopScan(){
 
   try{
     await qr.stop();
-    qr.clear();
+    await qr.clear();
     qr=null;
     scanning=false;
     show('Camera stopped.');
@@ -338,7 +398,10 @@ async function stopScan(){
 
 el('start').addEventListener('click',startScan);
 el('stop').addEventListener('click',stopScan);
-el('submit').addEventListener('click',()=>checkIn(el('manual').value));
+
+el('submit').addEventListener('click',()=>{
+  checkIn(el('manual').value);
+});
 
 el('manual').addEventListener('keydown',e=>{
   if(e.key==='Enter'){
@@ -348,6 +411,29 @@ el('manual').addEventListener('keydown',e=>{
 });
 
 el('scanner').addEventListener('change',volunteer);
+
+el('verifyButton').addEventListener('click',()=>{
+  if(!uncertainId)return;
+
+  const id=uncertainId;
+  const confirmed=window.confirm(
+    'Only continue if you have checked the Attendance Log and confirmed '+
+    id+' was NOT recorded. Retry this registration ID?'
+  );
+
+  if(!confirmed){
+    show(
+      'Retry cancelled. Check the Attendance Log before proceeding.',
+      'warn'
+    );
+    return;
+  }
+
+  uncertainId='';
+  el('verify').classList.remove('visible');
+  lastId='';
+  checkIn(id);
+});
 
 try{
   el('scanner').value=sessionStorage.getItem('iccScannerName')||'';
