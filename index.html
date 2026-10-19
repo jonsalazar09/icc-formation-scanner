@@ -32,6 +32,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 #photoPlaceholder.hidden{display:none}
 #participantName{font-size:21px;font-weight:700;color:#60243d;overflow-wrap:anywhere}
 #participantId{font-size:13px;color:#777;margin-top:5px}
+#participantChoir{font-size:16px;font-weight:700;color:#60243d;margin-top:9px;overflow-wrap:anywhere}
 #photoNote{font-size:12px;color:#777;margin-top:8px}
 #verify{display:none;margin-top:12px;padding:14px;border:1px solid #e2c78f;border-radius:10px;background:#fff8e9;color:#734700}
 #verify.visible{display:block}
@@ -61,6 +62,7 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
   <div id="photoPlaceholder">No photo available</div>
   <div id="participantName"></div>
   <div id="participantId"></div>
+  <div id="participantChoir"></div>
   <div id="photoNote"></div>
 </section>
 
@@ -72,6 +74,7 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
   <button id="verifyButton" type="button">I've checked the log — try again</button>
 </section>
 
+<small>Scanner version: 2026.10.19-choir-name-only</small>
 <small>Stay on this page to scan the next participant. If confirmation is uncertain, check the Attendance Log before retrying. Use a trusted device and keep this link private.</small>
 </main>
 
@@ -127,6 +130,7 @@ function clearParticipant(){
   el('photoPlaceholder').classList.remove('hidden');
   el('participantName').textContent='';
   el('participantId').textContent='';
+  el('participantChoir').textContent='';
   el('photoNote').textContent='';
 }
 
@@ -138,6 +142,8 @@ function displayParticipant(r,registrationId){
   panel.classList.add('visible');
   el('participantName').textContent=r.name||'Registered Participant';
   el('participantId').textContent=registrationId||'';
+  const choir=String(r.choir||r.choirName||'').trim();
+  el('participantChoir').textContent=choir||'Choir not available';
 
   const photoUrl=typeof r.photoDataUrl==='string'?r.photoDataUrl:'';
 
@@ -184,7 +190,7 @@ function finishRequest(req,data){
   // Photo lookup errors must not turn a successful check-in into failure.
   const success=r.ok===true;
 
-  if(r.name||r.photoDataUrl||r.photoMessage){
+  if(r.name||r.choir||r.choirName||r.photoDataUrl||r.photoMessage){
     displayParticipant(r,req.registrationId);
   }else{
     clearParticipant();
