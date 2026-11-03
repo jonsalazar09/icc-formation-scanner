@@ -19,6 +19,9 @@ button{background:#60243d;color:#fff;border:0;font-weight:600;cursor:pointer}
 button.secondary{background:#37445a}
 button:disabled{opacity:.5;cursor:not-allowed}
 #reader{width:100%;margin:12px auto;overflow:hidden}
+.camera-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.camera-controls button{font-size:14px;padding:12px 8px}
+@media(max-width:340px){.camera-controls{grid-template-columns:1fr}}
 #result{padding:14px;border-radius:10px;margin-top:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0eef0;line-height:1.55}
 #result.ok{background:#e2f4e8;color:#18552c}
 #result.warn{background:#fff1d9;color:#734700}
@@ -48,14 +51,9 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
 <label for="scanner">Volunteer / Registration Desk</label>
 <input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80">
 
-<button id="start" type="button">Start Camera Scanner</button>
-<button id="stop" type="button" class="secondary" disabled>Stop Camera</button>
-
 <div id="reader"></div>
 
-<label for="manual">Manual Registration ID</label>
-<input id="manual" placeholder="ICC26-00001" autocapitalize="characters" autocomplete="off" spellcheck="false">
-<button id="submit" type="button">Check In ID</button>
+<div id="result" role="status" aria-live="polite">Ready to scan.</div>
 
 <section id="participant" aria-live="polite">
   <img id="participantPhoto" alt="Participant identification photo">
@@ -66,7 +64,14 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
   <div id="photoNote"></div>
 </section>
 
-<div id="result" role="status" aria-live="polite">Ready to scan.</div>
+<div class="camera-controls">
+  <button id="start" type="button">Start Camera Scanner</button>
+  <button id="stop" type="button" class="secondary" disabled>Stop Camera</button>
+</div>
+
+<label for="manual">Manual Registration ID</label>
+<input id="manual" placeholder="ICC26-00001" autocapitalize="characters" autocomplete="off" spellcheck="false">
+<button id="submit" type="button">Check In ID</button>
 
 <section id="verify" aria-live="polite">
   <strong>Confirmation not received</strong>
@@ -74,7 +79,7 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
   <button id="verifyButton" type="button">I've checked the log — try again</button>
 </section>
 
-<small>Scanner version: 2026.10.19-choir-name-only</small>
+<small>Scanner version: 2026.11.03-result-layout</small>
 <small>Stay on this page to scan the next participant. If confirmation is uncertain, check the Attendance Log before retrying. Use a trusted device and keep this link private.</small>
 </main>
 
