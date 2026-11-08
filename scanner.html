@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#60243d">
+<title>ICC Music Ministry Formation 2026 | QR Attendance</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Arial,sans-serif;background:#f5f3f6;color:#24202a;margin:0;padding:16px}
+main{max-width:480px;margin:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px #0001}
+h1{color:#60243d;font-size:24px;margin:0 0 5px}
+.sub{color:#666;margin-bottom:18px}
+label{display:block;font-weight:600;margin-top:14px}
+input,button,select{width:100%;font-size:16px;padding:13px;border-radius:9px;margin:6px 0}
+input,select{border:1px solid #bbb;background:white}
+button{background:#60243d;color:#fff;border:0;font-weight:600;cursor:pointer}
+button.secondary{background:#37445a}
+button:disabled{opacity:.5;cursor:not-allowed}
+#reader{width:100%;margin:12px auto;overflow:hidden}
+.camera-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.camera-controls button{font-size:14px;padding:12px 8px}
+@media(max-width:340px){.camera-controls{grid-template-columns:1fr}}
+#result{padding:14px;border-radius:10px;margin-top:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0eef0;line-height:1.55}
+#result.ok{background:#e2f4e8;color:#18552c}
+#result.warn{background:#fff1d9;color:#734700}
+#result.bad{background:#ffe3e3;color:#862222}
+#result.info{background:#e8edf8;color:#273d65}
+#participant{display:none;text-align:center;padding:16px 12px 4px;margin-top:12px;border:1px solid #e7e1e6;border-radius:12px;background:#fff}
+#participant.visible{display:block}
+#participantPhoto{display:none;width:180px;height:180px;max-width:100%;object-fit:cover;border-radius:12px;border:2px solid #e7e1e6;margin:0 auto 12px}
+#participantPhoto.visible{display:block}
+#photoPlaceholder{display:flex;width:110px;height:110px;margin:0 auto 12px;border-radius:50%;align-items:center;justify-content:center;background:#f0eef0;color:#777;font-size:13px}
+#photoPlaceholder.hidden{display:none}
+#participantName{font-size:21px;font-weight:700;color:#60243d;overflow-wrap:anywhere}
+#participantId{font-size:13px;color:#777;margin-top:5px}
+#participantChoir{font-size:16px;font-weight:700;color:#60243d;margin-top:9px;overflow-wrap:anywhere}
+#photoNote{font-size:12px;color:#777;margin-top:8px}
+#verify{display:none;margin-top:12px;padding:14px;border:1px solid #e2c78f;border-radius:10px;background:#fff8e9;color:#734700}
+#verify.visible{display:block}
+#verify button{margin-top:10px}
+small{display:block;color:#777;margin-top:14px;line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+<h1>ICC Music Ministry Formation 2026</h1>
+<div class="sub">Participant QR Attendance · Check-In / Check-Out</div>
+
+<label for="mode">Attendance Action</label>
+<select id="mode" aria-label="Attendance Action"><option value="checkin">Check-In · Arrival</option><option value="checkout">Check-Out · Departure</option></select>
+<label for="scanner">Volunteer / Registration Desk</label>
+<input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80">
+
+<div id="reader"></div>
+
+<div id="result" role="status" aria-live="polite">Ready to scan.</div>
+
+<section id="participant" aria-live="polite">
+  <img id="participantPhoto" alt="Participant identification photo">
+  <div id="photoPlaceholder">No photo available</div>
+  <div id="participantName"></div>
+  <div id="participantId"></div>
+  <div id="participantChoir"></div>
+  <div id="photoNote"></div>
+</section>
+
+<div class="camera-controls">
+  <button id="start" type="button">Start Camera Scanner</button>
+  <button id="stop" type="button" class="secondary" disabled>Stop Camera</button>
+</div>
+
+<label for="manual">Manual Registration ID</label>
+<input id="manual" placeholder="ICC26-00001" autocapitalize="characters" autocomplete="off" spellcheck="false">
+<button id="submit" type="button">Submit ID</button>
+
+<section id="verify" aria-live="polite">
+  <strong>Confirmation not received</strong>
+  <p>The request may have been recorded, but the scanner did not receive its confirmation. Check the Attendance Log before retrying this ID.</p>
+  <button id="verifyButton" type="button">I've checked the log — try again</button>
+</section>
+
+<small>Scanner version: GitHub Check-In / Check-Out</small>
+<small>Stay on this page to scan the next participant. If confirmation is uncertain, check the Attendance Log before retrying. Use a trusted device and keep this link private.</small>
+</main>
+
+<script>
+'use strict';
+
+const ENDPOINT='https://script.google.com/macros/s/AKfycbzqKzKaVYE-4eRYYRkWeT-MsObHidVp_CgpJlYRvIkfoJlS2yIAACmu9x2dC9JOqWsO/exec';
+
+const el=id=>document.getElementById(id);
+
+let qr=null;
+let scanning=false;
+let starting=false;
+let busy=false;
+let pending=null;
+let lastId='';
+let lastAt=0;
+let uncertainId='';
+let requestSequence=0;
+
+function show(message,cls=''){
+  el('result').className=cls;
+  el('result').textContent=message;
+}
+
+function buttons(){
+  el('start').disabled=starting||scanning;
+  el('stop').disabled=!scanning||starting;
+  el('submit').disabled=busy;
+}
+
+function volunteer(){
+  const name=el('scanner').value.trim()||'Mobile volunteer';
+  try{sessionStorage.setItem('iccScannerName',name);}catch(_){}
+  return name;
+}
+
+function parseId(raw){
+  const m=String(raw||'').toUpperCase().match(/ICC26-\d{5,}/);
+  return m?m[0]:null;
+}
+
+function resumeCamera(){
+  if(qr&&scanning&&!busy){
+    try{qr.resume();}catch(_){}
+  }
+}
+
+function clearParticipant(){
+  el('participant').classList.remove('visible');
+  el('participantPhoto').classList.remove('visible');
+  el('participantPhoto').removeAttribute('src');
+  el('photoPlaceholder').classList.remove('hidden');
+  el('participantName').textContent='';
+  el('participantId').textContent='';
+  el('participantChoir').textContent='';
+  el('photoNote').textContent='';
+}
+
+function displayParticipant(r,registrationId){
+  const panel=el('participant');
+  const photo=el('participantPhoto');
+  const placeholder=el('photoPlaceholder');
+
+  panel.classList.add('visible');
+  el('participantName').textContent=r.name||'Registered Participant';
+  el('participantId').textContent=registrationId||'';
+  const choir=String(r.choir||r.choirName||'').trim();
+  el('participantChoir').textContent=choir||'Choir not available';
+
+  const photoUrl=typeof r.photoDataUrl==='string'?r.photoDataUrl:'';
+
+  if(photoUrl.startsWith('data:image/')){
+    photo.onload=()=>{
+      photo.classList.add('visible');
+      placeholder.classList.add('hidden');
+      el('photoNote').textContent='';
+    };
+
+    photo.onerror=()=>{
+      photo.classList.remove('visible');
+      photo.removeAttribute('src');
+      placeholder.classList.remove('hidden');
+      el('photoNote').textContent='The participant photo could not be displayed.';
+    };
+
+    photo.src=photoUrl;
+  }else{
+    photo.classList.remove('visible');
+    photo.removeAttribute('src');
+    placeholder.classList.remove('hidden');
+    el('photoNote').textContent=
+      r.photoMessage||'No uploaded photo was found for this participant.';
+  }
+}
+
+function finishRequest(req,data){
+  if(!pending||pending.id!==req.id)return;
+
+  pending=null;
+  clearTimeout(req.timeout);
+  if(req.script)req.script.remove();
+
+  busy=false;
+  uncertainId='';
+  el('verify').classList.remove('visible');
+
+  const r=data&&data.result?data.result:{};
+  const message=String(r.message||'');
+  const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(message);
+
+  // The backend's checkIn() result determines success.
+  // Photo lookup errors must not turn a successful check-in into failure.
+  const success=r.ok===true;
+  const mode=req.mode;
+  const actionLabel=mode==='checkout'?'CHECK-OUT':'CHECK-IN';
+
+  if(r.name||r.choir||r.choirName||r.photoDataUrl||r.photoMessage){
+    displayParticipant(r,req.registrationId);
+  }else{
+    clearParticipant();
+  }
+
+  if(success){
+    show(
+      '✓ '+actionLabel+' SUCCESSFUL\n'+
+      (r.name||'Participant: '+req.registrationId)+
+      '\n'+message+
+      (r.time?'\n'+r.time:''),
+      'ok'
+    );
+  }else if(duplicate){
+    show(
+      '! '+(mode==='checkout'?'ALREADY CHECKED OUT':'ALREADY CHECKED IN')+'\n'+
+      (r.name||'Participant: '+req.registrationId)+
+      '\n'+message,
+      'warn'
+    );
+  }else{
+    show(
+      '✕ '+actionLabel+' NOT COMPLETED\n'+
+      (r.name||'Participant: '+req.registrationId)+
+      '\n'+(message||'The server did not confirm the attendance action.'),
+      'bad'
+    );
+  }
+
+  buttons();
+  setTimeout(resumeCamera,1500);
+}
+
+function receiveResult(data){
+  if(!data)return;
+
+  // Ignore late responses from requests that have already timed out.
+  if(!pending||data.requestId!==pending.id)return;
+
+  finishRequest(pending,data);
+}
+
+window.iccReceiveCheckIn=receiveResult;
+window.iccReceiveCheckOut=receiveResult;
+
+function uncertain(req,reason){
+  if(!pending||pending.id!==req.id)return;
+
+  clearTimeout(req.timeout);
+  if(req.script)req.script.remove();
+
+  pending=null;
+  busy=false;
+  uncertainId=req.registrationId;
+
+  show(
+    reason+
+    '\nRegistration ID: '+req.registrationId+
+    '\nCheck the Attendance Log before trying this ID again.',
+    'bad'
+  );
+
+  el('verify').classList.add('visible');
+  buttons();
+  resumeCamera();
+}
+
+function submitAttendance(raw){
+  if(busy)return;
+
+  const id=parseId(raw);
+
+  if(!id){
+    show('Invalid QR or registration ID. Expected ICC26-00001 format.','bad');
+    return;
+  }
+
+  if(uncertainId){
+    show(
+      'Please check the Attendance Log for '+uncertainId+
+      ' before starting another check-in.',
+      'warn'
+    );
+    return;
+  }
+
+  const now=Date.now();
+  if(id===lastId&&now-lastAt<3000)return;
+
+  lastId=id;
+  lastAt=now;
+  busy=true;
+  buttons();
+
+  if(qr&&scanning){
+    try{qr.pause(true);}catch(_){}
+  }
+
+  clearParticipant();
+  el('verify').classList.remove('visible');
+  show('Sending '+(el('mode').value==='checkout'?'check-out':'check-in')+' request for '+id+'…','info');
+
+  const requestId=String(now)+'_'+(++requestSequence)+'_'+
+    Math.random().toString(36).slice(2,10);
+
+  const script=document.createElement('script');
+  const query=new URLSearchParams({
+    action:el('mode').value,
+    registrationId:id,
+    scannerName:volunteer(),
+    requestId:requestId
+  });
+
+  const req={
+    id:requestId,
+    registrationId:id,
+    mode:el('mode').value,
+    script:script,
+    timeout:null
+  };
+
+  pending=req;
+
+  req.timeout=setTimeout(()=>{
+    uncertain(
+      req,
+      'No confirmation was received before the request timed out.'
+    );
+  },30000);
+
+  script.onerror=()=>{
+    uncertain(
+      req,
+      'The browser could not load the Apps Script response.'
+    );
+  };
+
+  // Install the callback before adding the request script.
+  script.src=ENDPOINT+'?'+query.toString();
+  document.head.appendChild(script);
+}
+
+async function startScan(){
+  if(starting||scanning)return;
+
+  starting=true;
+  buttons();
+  show('Requesting camera access…','info');
+
+  try{
+    if(!window.isSecureContext){
+      throw Error('Open the HTTPS scanner address in Safari or Chrome.');
+    }
+
+    if(typeof Html5Qrcode==='undefined'){
+      throw Error('Scanner library did not load.');
+    }
+
+    qr=new Html5Qrcode('reader',{verbose:false});
+
+    await qr.start(
+      {facingMode:'environment'},
+      {
+        fps:10,
+        qrbox:(w,h)=>{
+          const size=Math.max(100,Math.min(220,w-24,h-24));
+          return{width:size,height:size};
+        }
+      },
+      decoded=>submitAttendance(decoded),
+      ()=>{}
+    );
+
+    scanning=true;
+    show('Camera ready. Point at a participant QR code.','ok');
+
+  }catch(err){
+    show(
+      'Camera unavailable: '+(err.message||String(err))+
+      '\nUse Manual Registration ID if needed.',
+      'bad'
+    );
+
+    if(qr){
+      try{await qr.clear();}catch(_){}
+    }
+
+    qr=null;
+    scanning=false;
+
+  }finally{
+    starting=false;
+    buttons();
+  }
+}
+
+async function stopScan(){
+  if(!qr||!scanning)return;
+
+  try{
+    await qr.stop();
+    await qr.clear();
+    qr=null;
+    scanning=false;
+    show('Camera stopped.');
+
+  }catch(err){
+    show('Could not stop camera: '+String(err),'bad');
+  }
+
+  buttons();
+}
+
+el('start').addEventListener('click',startScan);
+el('stop').addEventListener('click',stopScan);
+
+el('submit').addEventListener('click',()=>{
+  submitAttendance(el('manual').value);
+});
+
+el('manual').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    submitAttendance(el('manual').value);
+  }
+});
+
+el('scanner').addEventListener('change',volunteer);
+el('mode').addEventListener('change',()=>{lastId='';clearParticipant();show('Ready to '+(el('mode').value==='checkout'?'check out':'check in')+'.');});
+
+el('verifyButton').addEventListener('click',()=>{
+  if(!uncertainId)return;
+
+  const id=uncertainId;
+  const confirmed=window.confirm(
+    'Only continue if you have checked the Attendance Log and confirmed '+
+    id+' was NOT recorded. Retry this registration ID?'
+  );
+
+  if(!confirmed){
+    show(
+      'Retry cancelled. Check the Attendance Log before proceeding.',
+      'warn'
+    );
+    return;
+  }
+
+  uncertainId='';
+  el('verify').classList.remove('visible');
+  lastId='';
+  submitAttendance(id);
+});
+
+try{
+  el('scanner').value=sessionStorage.getItem('iccScannerName')||'';
+}catch(_){}
+
+buttons();
+</script>
+</body>
+</html>
