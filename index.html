@@ -17,6 +17,10 @@ input,button{width:100%;font-size:16px;padding:13px;border-radius:9px;margin:6px
 input{border:1px solid #bbb}
 button{background:#60243d;color:#fff;border:0;font-weight:600;cursor:pointer}
 button.secondary{background:#37445a}
+.mode-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.mode-controls button{background:#eae5e9;color:#60243d;border:2px solid transparent}
+.mode-controls button.active{background:#60243d;color:#fff;border-color:#60243d}
+.mode-controls button:focus-visible{outline:3px solid #c9a6b7;outline-offset:2px}
 button:disabled{opacity:.5;cursor:not-allowed}
 #reader{width:100%;margin:12px auto;overflow:hidden}
 .camera-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
@@ -46,11 +50,16 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
 <body>
 <main>
 <h1>ICC Music Ministry Formation 2026</h1>
-<div class="sub">Continuous Participant QR Attendance Check-In</div>
+<div class="sub">Participant QR Attendance Check-In / Check-Out</div>
 
 <label for="scanner">Volunteer / Registration Desk</label>
 <input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80">
 
+<label>Attendance Mode</label>
+<div class="mode-controls" role="group" aria-label="Attendance mode">
+  <button id="modeIn" type="button" class="active" aria-pressed="true">Check-In</button>
+  <button id="modeOut" type="button" aria-pressed="false">Check-Out</button>
+</div>
 <div id="reader"></div>
 
 <div id="result" role="status" aria-live="polite">Ready to scan.</div>
@@ -79,7 +88,7 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
   <button id="verifyButton" type="button">I've checked the log — try again</button>
 </section>
 
-<small>Scanner version: 2026.11.03-result-layout</small>
+<small>Scanner version: 2026.11.08-checkin-checkout</small>
 <small>Stay on this page to scan the next participant. If confirmation is uncertain, check the Attendance Log before retrying. Use a trusted device and keep this link private.</small>
 </main>
 
@@ -90,6 +99,7 @@ const ENDPOINT='https://script.google.com/macros/s/AKfycbzqKzKaVYE-4eRYYRkWeT-Ms
 
 const el=id=>document.getElementById(id);
 
+let mode="checkin";
 let qr=null;
 let scanning=false;
 let starting=false;
@@ -98,6 +108,7 @@ let pending=null;
 let lastId='';
 let lastAt=0;
 let uncertainId='';
+let uncertainMode="";
 let requestSequence=0;
 
 function show(message,cls=''){
@@ -109,6 +120,21 @@ function buttons(){
   el('start').disabled=starting||scanning;
   el('stop').disabled=!scanning||starting;
   el('submit').disabled=busy;
+  el('modeIn').disabled=busy||Boolean(uncertainId);
+  el('modeOut').disabled=busy||Boolean(uncertainId);
+}
+
+function setMode(next){
+  if(busy||uncertainId)return;
+  mode=next;
+  el("modeIn").classList.toggle("active",mode==="checkin");
+  el("modeOut").classList.toggle("active",mode==="checkout");
+  el("modeIn").setAttribute("aria-pressed",String(mode==="checkin"));
+  el("modeOut").setAttribute("aria-pressed",String(mode==="checkout"));
+  el("submit").textContent=mode==="checkin"?"Check In ID":"Check Out ID";
+  clearParticipant();
+  lastId="";lastAt=0;
+  show(mode==="checkin"?"Check-In mode ready. Scan a QR code.":"Check-Out mode ready. Scan a QR code.","info");
 }
 
 function volunteer(){
@@ -185,15 +211,18 @@ function finishRequest(req,data){
 
   busy=false;
   uncertainId='';
+  uncertainMode='';
   el('verify').classList.remove('visible');
 
   const r=data&&data.result?data.result:{};
   const message=String(r.message||'');
   const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(message);
 
-  // The backend's checkIn() result determines success.
+  // The backend result determines success.
   // Photo lookup errors must not turn a successful check-in into failure.
   const success=r.ok===true;
+  const isOut=req.mode==='checkout';
+  const verb=isOut?'CHECK-OUT':'CHECK-IN';
 
   if(r.name||r.choir||r.choirName||r.photoDataUrl||r.photoMessage){
     displayParticipant(r,req.registrationId);
@@ -203,7 +232,7 @@ function finishRequest(req,data){
 
   if(success){
     show(
-      '✓ CHECK-IN SUCCESSFUL\n'+
+      '✓ '+verb+' SUCCESSFUL\n'+
       (r.name||'Participant: '+req.registrationId)+
       '\n'+message+
       (r.time?'\n'+r.time:''),
@@ -211,14 +240,14 @@ function finishRequest(req,data){
     );
   }else if(duplicate){
     show(
-      '! ALREADY CHECKED IN\n'+
+      '! '+(isOut?'ALREADY CHECKED OUT / NOT ELIGIBLE':'ALREADY CHECKED IN')+'\n'+
       (r.name||'Participant: '+req.registrationId)+
       '\n'+message,
       'warn'
     );
   }else{
     show(
-      '✕ CHECK-IN NOT COMPLETED\n'+
+      '✕ '+verb+' NOT COMPLETED\n'+
       (r.name||'Participant: '+req.registrationId)+
       '\n'+(message||'The server did not confirm the check-in.'),
       'bad'
@@ -239,6 +268,7 @@ function receiveResult(data){
 }
 
 window.iccReceiveCheckIn=receiveResult;
+window.iccReceiveCheckOut=receiveResult;
 
 function uncertain(req,reason){
   if(!pending||pending.id!==req.id)return;
@@ -249,9 +279,11 @@ function uncertain(req,reason){
   pending=null;
   busy=false;
   uncertainId=req.registrationId;
+  uncertainMode=req.mode;
 
   show(
     reason+
+    '\nMode: '+(req.mode==='checkout'?'Check-Out':'Check-In')+
     '\nRegistration ID: '+req.registrationId+
     '\nCheck the Attendance Log before trying this ID again.',
     'bad'
@@ -262,7 +294,7 @@ function uncertain(req,reason){
   resumeCamera();
 }
 
-function checkIn(raw){
+function submitAttendance(raw){
   if(busy)return;
 
   const id=parseId(raw);
@@ -275,7 +307,7 @@ function checkIn(raw){
   if(uncertainId){
     show(
       'Please check the Attendance Log for '+uncertainId+
-      ' before starting another check-in.',
+      ' before starting another attendance request.',
       'warn'
     );
     return;
@@ -295,14 +327,15 @@ function checkIn(raw){
 
   clearParticipant();
   el('verify').classList.remove('visible');
-  show('Sending check-in request for '+id+'…','info');
+  const requestMode=mode;
+  show('Sending '+(requestMode==='checkout'?'check-out':'check-in')+' request for '+id+'…','info');
 
   const requestId=String(now)+'_'+(++requestSequence)+'_'+
     Math.random().toString(36).slice(2,10);
 
   const script=document.createElement('script');
   const query=new URLSearchParams({
-    action:'checkin',
+    action:requestMode,
     registrationId:id,
     scannerName:volunteer(),
     requestId:requestId
@@ -311,6 +344,7 @@ function checkIn(raw){
   const req={
     id:requestId,
     registrationId:id,
+    mode:requestMode,
     script:script,
     timeout:null
   };
@@ -363,12 +397,12 @@ async function startScan(){
           return{width:size,height:size};
         }
       },
-      decoded=>checkIn(decoded),
+      decoded=>submitAttendance(decoded),
       ()=>{}
     );
 
     scanning=true;
-    show('Camera ready. Point at a participant QR code.','ok');
+    show('Camera ready in '+(mode==='checkout'?'Check-Out':'Check-In')+' mode. Point at a participant QR code.','ok');
 
   }catch(err){
     show(
@@ -407,17 +441,19 @@ async function stopScan(){
   buttons();
 }
 
+el('modeIn').addEventListener('click',()=>setMode('checkin'));
+el('modeOut').addEventListener('click',()=>setMode('checkout'));
 el('start').addEventListener('click',startScan);
 el('stop').addEventListener('click',stopScan);
 
 el('submit').addEventListener('click',()=>{
-  checkIn(el('manual').value);
+  submitAttendance(el('manual').value);
 });
 
 el('manual').addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     e.preventDefault();
-    checkIn(el('manual').value);
+    submitAttendance(el('manual').value);
   }
 });
 
@@ -429,7 +465,7 @@ el('verifyButton').addEventListener('click',()=>{
   const id=uncertainId;
   const confirmed=window.confirm(
     'Only continue if you have checked the Attendance Log and confirmed '+
-    id+' was NOT recorded. Retry this registration ID?'
+    id+' was NOT recorded for '+(uncertainMode==='checkout'?'Check-Out':'Check-In')+'. Retry this registration ID?'
   );
 
   if(!confirmed){
@@ -441,9 +477,11 @@ el('verifyButton').addEventListener('click',()=>{
   }
 
   uncertainId='';
+  mode=uncertainMode||mode;
+  uncertainMode='';
   el('verify').classList.remove('visible');
   lastId='';
-  checkIn(id);
+  submitAttendance(id);
 });
 
 try{
