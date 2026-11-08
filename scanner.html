@@ -46,10 +46,9 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
 <body>
 <main>
 <h1>ICC Music Ministry Formation 2026</h1>
-<div class="sub">Participant QR Attendance · Check-In / Check-Out</div>
-
-<label for="mode">Attendance Action</label>
-<select id="mode" aria-label="Attendance Action"><option value="checkin">Check-In · Arrival</option><option value="checkout">Check-Out · Departure</option></select>
+<div class="sub" id="modeHeading">Participant QR Attendance</div>
+<input type="hidden" id="mode" value="checkin">
+<p><a href="index.html">← Back to Attendance Home</a></p>
 <label for="scanner">Volunteer / Registration Desk</label>
 <input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80">
 
@@ -428,7 +427,6 @@ el('manual').addEventListener('keydown',e=>{
 });
 
 el('scanner').addEventListener('change',volunteer);
-el('mode').addEventListener('change',()=>{lastId='';clearParticipant();show('Ready to '+(el('mode').value==='checkout'?'check out':'check in')+'.');});
 
 el('verifyButton').addEventListener('click',()=>{
   if(!uncertainId)return;
@@ -457,6 +455,15 @@ try{
   el('scanner').value=sessionStorage.getItem('iccScannerName')||'';
 }catch(_){}
 
+// Select the attendance mode from the GitHub landing page URL.
+const requestedMode = new URLSearchParams(window.location.search).get('mode');
+if (requestedMode === 'checkin' || requestedMode === 'checkout') {
+  el('mode').value = requestedMode;
+  el('modeHeading').textContent = requestedMode === 'checkout' ? 'CHECK-OUT · Departure' : 'CHECK-IN · Arrival';
+  show('Ready to ' + (requestedMode === 'checkout' ? 'check out' : 'check in') + '.');
+} else {
+  window.location.replace('index.html');
+}
 buttons();
 </script>
 </body>
