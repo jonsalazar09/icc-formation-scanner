@@ -109,7 +109,7 @@ function show(message,cls=''){
 function buttons(){
   el('start').disabled=starting||scanning;
   el('stop').disabled=!scanning||starting;
-  el('submit').disabled=busy;
+  el('submit').disabled=busy||Boolean(uncertainId);
 }
 
 function volunteer(){
@@ -263,11 +263,11 @@ function uncertain(req,reason){
 
   el('verify').classList.add('visible');
   buttons();
-  resumeCamera();
+  // Keep the camera paused until the operator resolves this uncertain scan.
 }
 
 function submitAttendance(raw){
-  if(busy)return;
+  if(busy||uncertainId)return;
 
   const id=parseId(raw);
 
@@ -448,6 +448,7 @@ el('verifyButton').addEventListener('click',()=>{
   uncertainId='';
   el('verify').classList.remove('visible');
   lastId='';
+  buttons();
   submitAttendance(id);
 });
 
