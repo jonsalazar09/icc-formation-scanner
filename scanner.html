@@ -80,7 +80,7 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
   <button id="verifyButton" type="button">I've checked the log — try again</button>
 </section>
 
-<small>Scanner version: GitHub Check-In / Check-Out · Photos enabled</small>
+<small>Scanner version: GitHub Check-In / Check-Out · Photos enabled · Request cleanup v2</small>
 <small>Stay on this page to scan the next participant. If confirmation is uncertain, check the Attendance Log before retrying. Use a trusted device and keep this link private.</small>
 </main>
 
@@ -100,6 +100,8 @@ let lastId='';
 let lastAt=0;
 let uncertainId='';
 let requestSequence=0;
+let completedScans=0;
+let photoStartedAt=0;
 
 function show(message,cls=''){
   el('result').className=cls;
@@ -131,8 +133,11 @@ function resumeCamera(){
 
 function clearParticipant(){
   el('participant').classList.remove('visible');
-  el('participantPhoto').classList.remove('visible');
-  el('participantPhoto').removeAttribute('src');
+  const oldPhoto=el('participantPhoto');
+  oldPhoto.onload=null;
+  oldPhoto.onerror=null;
+  oldPhoto.classList.remove('visible');
+  oldPhoto.removeAttribute('src');
   el('photoPlaceholder').classList.remove('hidden');
   el('participantName').textContent='';
   el('participantId').textContent='';
@@ -187,7 +192,7 @@ function loadPhoto(id){
   }
   const requestId='photo_'+Date.now()+'_'+(++requestSequence);
   const script=document.createElement('script');
-  const req={id:requestId,registrationId:id,script,timeout:null};
+  const req={id:requestId,registrationId:id,script,timeout:null,startedAt:performance.now()};
   photoPending=req;
   el('photoNote').textContent='Loading participant photo…';
   script.src=ENDPOINT+'?'+new URLSearchParams({action:'photo',registrationId:id,requestId}).toString();
@@ -215,6 +220,7 @@ window.iccReceivePhoto=function(data){
   // Never attach a previous participant's photo to the current participant.
   if(el('participantId').textContent!==req.registrationId)return;
   const r=data.result||{};
+  console.info('[ICC] Photo response',req.registrationId,Math.round(performance.now()-req.startedAt)+'ms');
   const photo=el('participantPhoto');
   const placeholder=el('photoPlaceholder');
   if(typeof r.photoDataUrl==='string'&&r.photoDataUrl.startsWith('data:image/')){
@@ -246,6 +252,8 @@ function finishRequest(req,data){
   uncertainId='';
   el('verify').classList.remove('visible');
 
+  completedScans++;
+  console.info('[ICC] Attendance response',req.registrationId,Math.round(performance.now()-req.startedAt)+'ms','completed:',completedScans);
   const r=data&&data.result?data.result:{};
   const message=String(r.message||'');
   const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(message);
@@ -256,9 +264,12 @@ function finishRequest(req,data){
   const mode=req.mode;
   const actionLabel=mode==='checkout'?'CHECK-OUT':'CHECK-IN';
 
-  if(r.name||r.choir||r.choirName||r.photoDataUrl||r.photoMessage){
+  if(r.name||r.choir||r.choirName||r.photoDataUrl||r.photoMessage||success||duplicate){
     displayParticipant(r,req.registrationId);
-    if(success||duplicate)loadPhoto(req.registrationId);
+    // If attendance already returned the photo, never request it again.
+    if((success||duplicate)&&!(typeof r.photoDataUrl==='string'&&r.photoDataUrl.startsWith('data:image/'))) {
+      loadPhoto(req.registrationId);
+    }
   }else{
     clearParticipant();
   }
@@ -377,7 +388,8 @@ function submitAttendance(raw){
     registrationId:id,
     mode:el('mode').value,
     script:script,
-    timeout:null
+    timeout:null,
+    startedAt:performance.now()
   };
 
   pending=req;
