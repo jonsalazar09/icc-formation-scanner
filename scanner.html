@@ -80,7 +80,7 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
   <button id="verifyButton" type="button">I've checked the log — try again</button>
 </section>
 
-<small>Scanner version: GitHub Check-In / Check-Out · Photos enabled · Request cleanup v2</small>
+<small>Scanner version: GitHub Check-In / Check-Out · Photos together · Request cleanup v3</small>
 <small>Stay on this page to scan the next participant. If confirmation is uncertain, check the Attendance Log before retrying. Use a trusted device and keep this link private.</small>
 </main>
 
@@ -267,7 +267,10 @@ function finishRequest(req,data){
   if(r.name||r.choir||r.choirName||r.photoDataUrl||r.photoMessage||success||duplicate){
     displayParticipant(r,req.registrationId);
     // If attendance already returned the photo, never request it again.
-    if((success||duplicate)&&!(typeof r.photoDataUrl==='string'&&r.photoDataUrl.startsWith('data:image/'))) {
+    // Backend now returns photoDataUrl (possibly empty) in the same response.
+    // Avoid a redundant second request when photo is missing or unavailable.
+    if((success||duplicate)&&!Object.prototype.hasOwnProperty.call(r,'photoDataUrl')&&
+       !Object.prototype.hasOwnProperty.call(r,'photoMessage')) {
       loadPhoto(req.registrationId);
     }
   }else{
