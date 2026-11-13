@@ -182,62 +182,47 @@ function displayParticipant(r,registrationId){
   }
 }
 
-// Photos are fetched independently so attendance confirmation is not delayed.
+// Fetch photo after attendance is saved; reveal the entire result together.
 let photoPending=null;
-function loadPhoto(id){
-  if(photoPending){
-    clearTimeout(photoPending.timeout);
-    photoPending.script.remove();
-    photoPending=null;
-  }
+function completeWithPhoto(req, photoResult){
+  if(!pending || pending.id!==req.id)return;
+  const combined=Object.assign({},req.attendanceResult,photoResult);
+  if(!Object.prototype.hasOwnProperty.call(combined,'photoDataUrl'))combined.photoDataUrl='';
+  finishRequest(req,{result:combined});
+}
+function loadPhoto(id, attendanceReq){
+  if(photoPending){clearTimeout(photoPending.timeout);photoPending.script.remove();photoPending=null;}
   const requestId='photo_'+Date.now()+'_'+(++requestSequence);
   const script=document.createElement('script');
-  const req={id:requestId,registrationId:id,script,timeout:null,startedAt:performance.now()};
+  const req={id:requestId,registrationId:id,script,timeout:null,startedAt:performance.now(),attendanceReq};
   photoPending=req;
-  el('photoNote').textContent='Loading participant photo…';
   script.src=ENDPOINT+'?'+new URLSearchParams({action:'photo',registrationId:id,requestId}).toString();
-  req.timeout=setTimeout(()=>{
+  function fallback(message){
     if(photoPending!==req)return;
-    photoPending=null;
-    script.remove();
-    el('photoNote').textContent='Photo loading timed out. Attendance result is unaffected.';
-  },15000);
-  script.onerror=()=>{
-    if(photoPending!==req)return;
-    clearTimeout(req.timeout);
-    photoPending=null;
-    script.remove();
-    el('photoNote').textContent='Photo could not be loaded. Attendance result is unaffected.';
-  };
+    clearTimeout(req.timeout);script.remove();photoPending=null;
+    completeWithPhoto(attendanceReq,{photoDataUrl:'',photoMessage:message});
+  }
+  req.timeout=setTimeout(()=>fallback('Photo timed out. Attendance was recorded.'),15000);
+  script.onerror=()=>fallback('Photo unavailable. Attendance was recorded.');
   document.head.appendChild(script);
 }
 window.iccReceivePhoto=function(data){
   if(!photoPending||!data||data.requestId!==photoPending.id)return;
   const req=photoPending;
-  clearTimeout(req.timeout);
-  req.script.remove();
-  photoPending=null;
-  // Never attach a previous participant's photo to the current participant.
-  if(el('participantId').textContent!==req.registrationId)return;
+  clearTimeout(req.timeout);req.script.remove();photoPending=null;
   const r=data.result||{};
   console.info('[ICC] Photo response',req.registrationId,Math.round(performance.now()-req.startedAt)+'ms');
-  const photo=el('participantPhoto');
-  const placeholder=el('photoPlaceholder');
   if(typeof r.photoDataUrl==='string'&&r.photoDataUrl.startsWith('data:image/')){
-    photo.onload=()=>{
-      if(el('participantId').textContent!==req.registrationId)return;
-      photo.classList.add('visible');
-      placeholder.classList.add('hidden');
-      el('photoNote').textContent='';
-    };
-    photo.onerror=()=>{
-      photo.classList.remove('visible');
-      placeholder.classList.remove('hidden');
-      el('photoNote').textContent='Photo could not be displayed.';
-    };
-    photo.src=r.photoDataUrl;
+    // Decode before showing the participant panel to avoid a photo popping in later.
+    const preview=new Image();
+    let finished=false;
+    const complete=(photoResult)=>{if(finished)return;finished=true;completeWithPhoto(req.attendanceReq,photoResult);};
+    const guard=setTimeout(()=>complete({photoDataUrl:'',photoMessage:'Photo display timed out.'}),3000);
+    preview.onload=()=>{clearTimeout(guard);complete(r);};
+    preview.onerror=()=>{clearTimeout(guard);complete({photoDataUrl:'',photoMessage:'Photo could not be displayed.'});};
+    preview.src=r.photoDataUrl;
   }else{
-    el('photoNote').textContent=r.photoMessage||'No participant photo available.';
+    completeWithPhoto(req.attendanceReq,r);
   }
 };
 
@@ -266,12 +251,7 @@ function finishRequest(req,data){
 
   if(r.name||r.choir||r.choirName||r.photoDataUrl||r.photoMessage||success||duplicate){
     displayParticipant(r,req.registrationId);
-    // Fetch the photo separately after the attendance result is displayed.
-    // The request is read-only and never changes attendance.
-    if((success||duplicate)&&!Object.prototype.hasOwnProperty.call(r,'photoDataUrl')&&
-       !Object.prototype.hasOwnProperty.call(r,'photoMessage')) {
-      loadPhoto(req.registrationId);
-    }
+
   }else{
     clearParticipant();
   }
@@ -305,12 +285,22 @@ function finishRequest(req,data){
 }
 
 function receiveResult(data){
-  if(!data)return;
-
-  // Ignore late responses from requests that have already timed out.
-  if(!pending||data.requestId!==pending.id)return;
-
-  finishRequest(pending,data);
+  if(!data||!pending||data.requestId!==pending.id)return;
+  const req=pending;
+  const r=data.result||{};
+  const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(String(r.message||''));
+  if((r.ok===true||duplicate)&&!Object.prototype.hasOwnProperty.call(r,'photoDataUrl')&&
+     !Object.prototype.hasOwnProperty.call(r,'photoMessage')){
+    // Attendance is confirmed on the server, but wait to reveal all details together.
+    clearTimeout(req.timeout);
+    req.timeout=null;
+    if(req.script){req.script.remove();req.script=null;}
+    req.attendanceResult=r;
+    show('Attendance recorded. Preparing participant photo and details…','info');
+    loadPhoto(req.registrationId,req);
+    return;
+  }
+  finishRequest(req,data);
 }
 
 window.iccReceiveCheckIn=receiveResult;
