@@ -6,73 +6,111 @@
 <meta name="theme-color" content="#60243d">
 <title>ICC Music Ministry Formation 2026 | QR Attendance</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
 <style>
+:root{--wine:#651638;--wine2:#841d49;--navy:#26364d;--ink:#202333;--muted:#6d6b73;--paper:#fffdfb;--line:#e8e0e5;--green:#16823a;--greenbg:#e8f6eb;--amber:#8a5a08;--amberbg:#fff4dc;--red:#9c2929;--redbg:#ffebeb}
 *{box-sizing:border-box}
-body{font-family:system-ui,-apple-system,Arial,sans-serif;background:#f5f3f6;color:#24202a;margin:0;padding:16px}
-main{max-width:480px;margin:auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 20px #0001}
-h1{color:#60243d;font-size:24px;margin:0 0 5px}
-.sub{color:#666;margin-bottom:18px}
-label{display:block;font-weight:600;margin-top:14px}
-input,button,select{width:100%;font-size:16px;padding:13px;border-radius:9px;margin:6px 0}
-input,select{border:1px solid #bbb;background:white}
-button{background:#60243d;color:#fff;border:0;font-weight:600;cursor:pointer}
-button.secondary{background:#37445a}
-button:disabled{opacity:.5;cursor:not-allowed}
-#reader{width:100%;margin:12px auto;overflow:hidden}
-.camera-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.camera-controls button{font-size:14px;padding:12px 8px}
-@media(max-width:340px){.camera-controls{grid-template-columns:1fr}}
-#result{padding:14px;border-radius:10px;margin-top:14px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0eef0;line-height:1.55}
-#result.ok{background:#e2f4e8;color:#18552c}
-#result.warn{background:#fff1d9;color:#734700}
-#result.bad{background:#ffe3e3;color:#862222}
-#result.info{background:#e8edf8;color:#273d65}
-#participant{display:none;text-align:center;padding:16px 12px 4px;margin-top:12px;border:1px solid #e7e1e6;border-radius:12px;background:#fff}
-#participant.visible{display:block}
-#participantPhoto{display:none;width:180px;height:180px;max-width:100%;object-fit:cover;border-radius:12px;border:2px solid #e7e1e6;margin:0 auto 12px}
+html{min-height:100%;background:#f7f3f5}
+body{margin:0;padding:0 0 env(safe-area-inset-bottom);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);background:linear-gradient(180deg,#f5e9ee 0,#faf8f8 230px,#f7f3f5 100%);-webkit-text-size-adjust:100%}
+main{width:100%;max-width:620px;min-height:100dvh;margin:0 auto;padding:0 14px 24px;background:transparent}
+header{margin:0 -14px 12px;padding:19px 18px 17px;background:linear-gradient(135deg,#4e102c,#781b43);color:#fff;text-align:center;border-bottom:4px solid #d8b46c}
+.brand{font-size:11px;letter-spacing:1.6px;font-weight:700;opacity:.9;text-transform:uppercase}
+h1{font-family:Georgia,serif;font-size:clamp(23px,6vw,31px);line-height:1.08;margin:6px 0 4px;color:#fff}
+.sub{font-size:14px;color:#f8eaf0;margin:0}
+.event-meta{font-size:11px;color:#f2dfe7;margin-top:9px}
+a{color:inherit}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 2px 8px #3510210a}
+.online{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--green)}
+.dot{width:10px;height:10px;border-radius:50%;background:#20b45a;box-shadow:0 0 0 4px #20b45a20}
+.station{flex:1;min-width:0;text-align:right;font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#scanner{width:100%;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:14px}
+#reader{width:100%;margin:12px auto 8px;overflow:hidden;border-radius:18px;background:#17151a;min-height:220px;box-shadow:0 5px 18px #2a10201a}
+#reader video{object-fit:cover!important}
+#reader__scan_region{min-height:220px}
+#reader__dashboard{padding:8px!important;background:#fff}
+#reader__dashboard_section_csr button,#reader button{border-radius:9px!important}
+.scan-hint{text-align:center;font-size:12px;color:var(--muted);margin:6px 4px 12px}
+#result{padding:13px 14px;border-radius:13px;margin:10px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0edf1;color:var(--ink);line-height:1.45;font-size:14px;font-weight:600;border:1px solid transparent}
+#result.ok{background:var(--greenbg);color:#145b2a;border-color:#b9e1c3}
+#result.warn{background:var(--amberbg);color:#754b08;border-color:#f0d59c}
+#result.bad{background:var(--redbg);color:#842323;border-color:#f1c0c0}
+#result.info{background:#edf2fa;color:#2b4267;border-color:#d5e0f1}
+#participant{display:none;padding:14px;margin-top:10px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 3px 12px #3510210a}
+#participant.visible{display:grid;grid-template-columns:92px minmax(0,1fr);gap:12px;align-items:center;text-align:left}
+#participantPhoto{display:none;width:92px;height:112px;object-fit:cover;border-radius:11px;border:2px solid #eadfe5;margin:0}
 #participantPhoto.visible{display:block}
-#photoPlaceholder{display:flex;width:110px;height:110px;margin:0 auto 12px;border-radius:50%;align-items:center;justify-content:center;background:#f0eef0;color:#777;font-size:13px}
+#photoPlaceholder{display:flex;width:92px;height:112px;margin:0;border-radius:11px;align-items:center;justify-content:center;text-align:center;padding:8px;background:#f3eff1;color:#777;font-size:11px}
 #photoPlaceholder.hidden{display:none}
-#participantName{font-size:21px;font-weight:700;color:#60243d;overflow-wrap:anywhere}
-#participantId{font-size:13px;color:#777;margin-top:5px}
-#participantChoir{font-size:16px;font-weight:700;color:#60243d;margin-top:9px;overflow-wrap:anywhere}
-#photoNote{font-size:12px;color:#777;margin-top:8px}
-#verify{display:none;margin-top:12px;padding:14px;border:1px solid #e2c78f;border-radius:10px;background:#fff8e9;color:#734700}
+#participantName{font-size:18px;font-weight:800;color:var(--wine);line-height:1.2;overflow-wrap:anywhere}
+#participantId{font-size:12px;color:#74717a;margin-top:4px}
+#participantChoir{font-size:14px;font-weight:700;color:var(--navy);margin-top:7px;overflow-wrap:anywhere}
+#photoNote{font-size:11px;color:#777;margin-top:5px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+button{width:100%;min-height:48px;padding:12px 10px;border:0;border-radius:12px;background:var(--wine);color:#fff;font-size:14px;font-weight:750;cursor:pointer;touch-action:manipulation}
+button.secondary{background:var(--navy)}
+button.light{background:#fff;color:var(--navy);border:1px solid #cbd1dc}
+button:disabled{opacity:.48;cursor:not-allowed}
+.manual{margin-top:15px;padding:13px;background:#fff;border:1px solid var(--line);border-radius:14px}
+.manual-title{font-size:13px;font-weight:800;color:var(--wine);margin-bottom:6px}
+.manual-row{display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:8px}
+input{width:100%;min-width:0;font-size:16px;padding:12px;border-radius:10px;border:1px solid #cfc6cd;background:#fff}
+.manual-row button{min-height:46px}
+#verify{display:none;margin-top:12px;padding:13px;border:1px solid #e2c78f;border-radius:12px;background:#fff8e9;color:#734700;font-size:13px}
 #verify.visible{display:block}
-#verify button{margin-top:10px}
-small{display:block;color:#777;margin-top:14px;line-height:1.5}
+#verify button{margin-top:8px}
+small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
+.footer-note{text-align:center;padding:10px 4px 0}
+@media(max-width:360px){main{padding-left:10px;padding-right:10px}.actions{grid-template-columns:1fr}.manual-row{grid-template-columns:minmax(0,1fr) 88px}#participant.visible{grid-template-columns:78px minmax(0,1fr)}#participantPhoto,#photoPlaceholder{width:78px;height:100px}#participantName{font-size:16px}}
 </style>
+
 </head>
 <body>
+
 <main>
-<h1>ICC Music Ministry Formation 2026</h1>
-<div class="sub" id="modeHeading">Participant QR Attendance</div>
+<header>
+  <div class="brand">Immaculate Conception Cathedral</div>
+  <h1>Music Ministry Formation 2026</h1>
+  <div class="sub" id="modeHeading">Participant QR Attendance</div>
+  <div class="event-meta">NOVEMBER 28, 2026 · AUTHORIZED VOLUNTEERS ONLY</div>
+</header>
+
+<div class="topbar">
+  <div class="online"><span class="dot"></span><span>Scanner ready</span></div>
+  <div class="station" id="stationLabel">Mobile Registration Desk</div>
+</div>
+
 <input type="hidden" id="mode" value="checkin">
-<p><a href="index.html">← Back to Attendance Home</a></p>
-<label for="scanner">Volunteer / Registration Desk</label>
-<input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80">
+<label for="scanner" style="display:block;font-size:12px;font-weight:700;color:#655b63;margin:12px 2px 0">VOLUNTEER / REGISTRATION DESK</label>
+<input id="scanner" placeholder="e.g., Desk 1 - Maria" maxlength="80" autocomplete="off">
 
 <div id="reader"></div>
+<div class="scan-hint">Position the participant's QR code inside the camera frame.</div>
 
-<div id="result" role="status" aria-live="polite">Ready to scan.</div>
+<div id="result" role="status" aria-live="polite">Ready to scan. Tap Start Camera when you're ready.</div>
 
 <section id="participant" aria-live="polite">
   <img id="participantPhoto" alt="Participant identification photo">
-  <div id="photoPlaceholder">No photo available</div>
-  <div id="participantName"></div>
-  <div id="participantId"></div>
-  <div id="participantChoir"></div>
-  <div id="photoNote"></div>
+  <div id="photoPlaceholder">Participant photo</div>
+  <div>
+    <div id="participantName"></div>
+    <div id="participantId"></div>
+    <div id="participantChoir"></div>
+    <div id="photoNote"></div>
+  </div>
 </section>
 
-<div class="camera-controls">
-  <button id="start" type="button">Start Camera Scanner</button>
-  <button id="stop" type="button" class="secondary" disabled>Stop Camera</button>
+<div class="actions">
+  <button id="start" type="button">Start Camera</button>
+  <button id="stop" type="button" class="secondary" disabled>Pause Camera</button>
 </div>
 
-<label for="manual">Manual Registration ID</label>
-<input id="manual" placeholder="ICC26-00001" autocapitalize="characters" autocomplete="off" spellcheck="false">
-<button id="submit" type="button">Submit ID</button>
+<section class="manual">
+  <div class="manual-title">MANUAL REGISTRATION ID</div>
+  <div class="manual-row">
+    <input id="manual" placeholder="ICC26-00001" autocapitalize="characters" autocomplete="off" spellcheck="false">
+    <button id="submit" type="button">Submit</button>
+  </div>
+</section>
 
 <section id="verify" aria-live="polite">
   <strong>Confirmation not received</strong>
@@ -80,9 +118,12 @@ small{display:block;color:#777;margin-top:14px;line-height:1.5}
   <button id="verifyButton" type="button">I've checked the log — try again</button>
 </section>
 
-<small>Scanner version: GitHub Check-In / Check-Out · Async photos · Request cleanup v4</small>
-<small>Stay on this page to scan the next participant. If confirmation is uncertain, check the Attendance Log before retrying. Use a trusted device and keep this link private.</small>
+<div class="footer-note">
+  <small>Keep this page open between participants. Each phone operates as an independent scanner. If confirmation is uncertain, check the Attendance Log before retrying.</small>
+  <small>ICC Music Ministry Formation 2026 · Mobile Scanner</small>
+</div>
 </main>
+
 
 <script>
 'use strict';
@@ -117,6 +158,8 @@ function buttons(){
 function volunteer(){
   const name=el('scanner').value.trim()||'Mobile volunteer';
   try{sessionStorage.setItem('iccScannerName',name);}catch(_){}
+  const station=el('stationLabel');
+  if(station)station.textContent=name;
   return name;
 }
 
@@ -182,47 +225,44 @@ function displayParticipant(r,registrationId){
   }
 }
 
-// Fetch photo after attendance is saved; reveal the entire result together.
+
+// Photo retrieval is deliberately independent of the attendance transaction.
+// A slow photo must never keep the scanner busy or block the next participant.
 let photoPending=null;
-function completeWithPhoto(req, photoResult){
-  if(!pending || pending.id!==req.id)return;
-  const combined=Object.assign({},req.attendanceResult,photoResult);
-  if(!Object.prototype.hasOwnProperty.call(combined,'photoDataUrl'))combined.photoDataUrl='';
-  finishRequest(req,{result:combined});
-}
-function loadPhoto(id, attendanceReq){
+let activePhotoRequest='';
+function loadPhoto(id, attendanceRequestId){
   if(photoPending){clearTimeout(photoPending.timeout);photoPending.script.remove();photoPending=null;}
   const requestId='photo_'+Date.now()+'_'+(++requestSequence);
   const script=document.createElement('script');
-  const req={id:requestId,registrationId:id,script,timeout:null,startedAt:performance.now(),attendanceReq};
+  const req={id:requestId,registrationId:id,script,timeout:null};
   photoPending=req;
+  activePhotoRequest=requestId;
+  el('photoNote').textContent='Loading participant photo…';
   script.src=ENDPOINT+'?'+new URLSearchParams({action:'photo',registrationId:id,requestId}).toString();
   function fallback(message){
     if(photoPending!==req)return;
     clearTimeout(req.timeout);script.remove();photoPending=null;
-    completeWithPhoto(attendanceReq,{photoDataUrl:'',photoMessage:message});
+    if(activePhotoRequest!==requestId)return;
+    el('photoNote').textContent=message;
   }
-  req.timeout=setTimeout(()=>fallback('Photo timed out. Attendance was recorded.'),15000);
-  script.onerror=()=>fallback('Photo unavailable. Attendance was recorded.');
+  req.timeout=setTimeout(()=>fallback('Photo timed out. Attendance is recorded.'),12000);
+  script.onerror=()=>fallback('Photo unavailable. Attendance is recorded.');
   document.head.appendChild(script);
 }
 window.iccReceivePhoto=function(data){
   if(!photoPending||!data||data.requestId!==photoPending.id)return;
   const req=photoPending;
   clearTimeout(req.timeout);req.script.remove();photoPending=null;
+  if(activePhotoRequest!==req.id || el('participantId').textContent!==req.registrationId)return;
   const r=data.result||{};
-  console.info('[ICC] Photo response',req.registrationId,Math.round(performance.now()-req.startedAt)+'ms');
+  const photo=el('participantPhoto');
+  const placeholder=el('photoPlaceholder');
   if(typeof r.photoDataUrl==='string'&&r.photoDataUrl.startsWith('data:image/')){
-    // Decode before showing the participant panel to avoid a photo popping in later.
-    const preview=new Image();
-    let finished=false;
-    const complete=(photoResult)=>{if(finished)return;finished=true;completeWithPhoto(req.attendanceReq,photoResult);};
-    const guard=setTimeout(()=>complete({photoDataUrl:'',photoMessage:'Photo display timed out.'}),3000);
-    preview.onload=()=>{clearTimeout(guard);complete(r);};
-    preview.onerror=()=>{clearTimeout(guard);complete({photoDataUrl:'',photoMessage:'Photo could not be displayed.'});};
-    preview.src=r.photoDataUrl;
+    photo.onload=()=>{photo.classList.add('visible');placeholder.classList.add('hidden');el('photoNote').textContent='';};
+    photo.onerror=()=>{photo.classList.remove('visible');photo.removeAttribute('src');placeholder.classList.remove('hidden');el('photoNote').textContent='Photo could not be displayed.';};
+    photo.src=r.photoDataUrl;
   }else{
-    completeWithPhoto(req.attendanceReq,r);
+    el('photoNote').textContent=r.photoMessage||'No uploaded photo was found.';
   }
 };
 
@@ -242,6 +282,17 @@ function finishRequest(req,data){
   const r=data&&data.result?data.result:{};
   const message=String(r.message||'');
   const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(message);
+
+  // retry:true means the server did not acquire its lock, so this attempt was not run.
+  // Never auto-retry an uncertain timeout or network error.
+  if(r.retry===true && req.retryAttempt<2){
+    busy=false;
+    show('The attendance service is busy. Retrying safely…','info');
+    buttons();
+    const nextAttempt=req.retryAttempt+1;
+    setTimeout(()=>submitAttendance(req.registrationId,true,nextAttempt),350*nextAttempt);
+    return;
+  }
 
   // The backend's checkIn() result determines success.
   // Photo lookup errors must not turn a successful check-in into failure.
@@ -291,13 +342,9 @@ function receiveResult(data){
   const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(String(r.message||''));
   if((r.ok===true||duplicate)&&!Object.prototype.hasOwnProperty.call(r,'photoDataUrl')&&
      !Object.prototype.hasOwnProperty.call(r,'photoMessage')){
-    // Attendance is confirmed on the server, but wait to reveal all details together.
-    clearTimeout(req.timeout);
-    req.timeout=null;
-    if(req.script){req.script.remove();req.script=null;}
-    req.attendanceResult=r;
-    show('Attendance recorded. Preparing participant photo and details…','info');
-    loadPhoto(req.registrationId,req);
+    // Confirm attendance and release the scanner first; photo lookup runs in the background.
+    finishRequest(req,{result:r});
+    if(r.ok===true||duplicate)loadPhoto(req.registrationId,req.id);
     return;
   }
   finishRequest(req,data);
@@ -328,7 +375,7 @@ function uncertain(req,reason){
   // Keep the camera paused until the operator resolves this uncertain scan.
 }
 
-function submitAttendance(raw){
+function submitAttendance(raw,isRetry=false,retryAttempt=0){
   if(busy||uncertainId)return;
 
   const id=parseId(raw);
@@ -348,7 +395,7 @@ function submitAttendance(raw){
   }
 
   const now=Date.now();
-  if(id===lastId&&now-lastAt<3000)return;
+  if(!isRetry&&id===lastId&&now-lastAt<3000)return;
 
   lastId=id;
   lastAt=now;
@@ -360,6 +407,7 @@ function submitAttendance(raw){
   }
 
   if(photoPending){clearTimeout(photoPending.timeout);photoPending.script.remove();photoPending=null;}
+  activePhotoRequest='';
   clearParticipant();
   el('verify').classList.remove('visible');
   show('Sending '+(el('mode').value==='checkout'?'check-out':'check-in')+' request for '+id+'…','info');
@@ -381,7 +429,8 @@ function submitAttendance(raw){
     mode:el('mode').value,
     script:script,
     timeout:null,
-    startedAt:performance.now()
+    startedAt:performance.now(),
+    retryAttempt:retryAttempt
   };
 
   pending=req;
@@ -467,7 +516,7 @@ async function stopScan(){
     await qr.clear();
     qr=null;
     scanning=false;
-    show('Camera stopped.');
+    show('Camera paused. Tap Start Camera to resume.','info');
 
   }catch(err){
     show('Could not stop camera: '+String(err),'bad');
