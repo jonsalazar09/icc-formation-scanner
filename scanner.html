@@ -107,8 +107,6 @@ small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
   <button id="start" type="button">Start Camera</button>
   <button id="stop" type="button" class="secondary" disabled>Pause Camera</button>
 </div>
-<button id="testBeep" type="button" class="light" style="margin-top:9px;min-height:42px">🎵 Test Check-In Chime</button>
-<button id="testCheckoutBell" type="button" class="light" style="margin-top:9px;min-height:42px">🔔 Test Check-Out Bell</button>
 
 <section class="manual">
   <div class="manual-title">MANUAL REGISTRATION ID</div>
@@ -168,7 +166,11 @@ function unlockScannerAudio(){
 
 function playScannerSound(type='checkin'){
   try{
-    if(!scannerAudioContext||scannerAudioContext.state!=='running')return;
+    if(!scannerAudioContext)unlockScannerAudio();
+    if(!scannerAudioContext)return;
+    if(scannerAudioContext.state==='suspended'){
+      scannerAudioContext.resume().catch(()=>{});
+    }
     const ctx=scannerAudioContext;
     const now=ctx.currentTime+0.01;
 
@@ -358,7 +360,7 @@ function finishRequest(req,data){
   console.info('[ICC] Attendance response',req.registrationId,Math.round(performance.now()-req.startedAt)+'ms','completed:',completedScans);
   const r=data&&data.result?data.result:{};
   const message=String(r.message||'');
-  const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(message);
+  const duplicate=r.duplicate===true||/already\s+check(?:ed)?[\s-]*(?:in|out)|previously\s+check(?:ed)?[\s-]*(?:in|out)|duplicate|already\s+(?:registered|scanned)/i.test(message);
 
   // retry:true means the server did not acquire its lock, so this attempt was not run.
   // Never auto-retry an uncertain timeout or network error.
@@ -384,7 +386,7 @@ function finishRequest(req,data){
     clearParticipant();
   }
 
-  if(success){
+  if(success&&!duplicate){
     playScannerSound(mode==='checkout'?'checkout':'checkin');
     show(
       '✓ '+actionLabel+' SUCCESSFUL\n'+
@@ -419,7 +421,7 @@ function receiveResult(data){
   if(!data||!pending||data.requestId!==pending.id)return;
   const req=pending;
   const r=data.result||{};
-  const duplicate=Boolean(r.duplicate)||/already checked|duplicate/i.test(String(r.message||''));
+  const duplicate=r.duplicate===true||/already\s+check(?:ed)?[\s-]*(?:in|out)|previously\s+check(?:ed)?[\s-]*(?:in|out)|duplicate|already\s+(?:registered|scanned)/i.test(String(r.message||''));
   if((r.ok===true||duplicate)&&!Object.prototype.hasOwnProperty.call(r,'photoDataUrl')&&
      !Object.prototype.hasOwnProperty.call(r,'photoMessage')){
     // Confirm attendance and release the scanner first; photo lookup runs in the background.
@@ -607,19 +609,6 @@ async function stopScan(){
 
   buttons();
 }
-
-el('testBeep').addEventListener('click',async()=>{
-  unlockScannerAudio();
-  if(scannerAudioContext&&scannerAudioContext.state==='suspended'){
-    try{await scannerAudioContext.resume();}catch(_){}
-  }
-  playScannerSound('checkin');
-});
-
-el('testCheckoutBell').addEventListener('click',()=>{
-  unlockScannerAudio();
-  playScannerSound('checkout');
-});
 
 el('start').addEventListener('click',startScan);
 el('stop').addEventListener('click',stopScan);
