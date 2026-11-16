@@ -107,6 +107,7 @@ small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
   <button id="start" type="button">Start Camera</button>
   <button id="stop" type="button" class="secondary" disabled>Pause Camera</button>
 </div>
+<button id="testBeep" type="button" class="light" style="margin-top:9px;min-height:42px">🔊 Test High-Pitched Beep</button>
 
 <section class="manual">
   <div class="manual-title">MANUAL REGISTRATION ID</div>
@@ -169,26 +170,30 @@ function playScannerSound(type='success'){
     if(!scannerAudioContext||scannerAudioContext.state!=='running')return;
 
     const sounds={
-      success:{frequency:1046.5,duration:0.16},
-      duplicate:{frequency:659.3,duration:0.22},
-      invalid:{frequency:293.7,duration:0.30},
-      error:{frequency:392,duration:0.28}
+      success:{frequency:2200,duration:0.12,wave:'square',volume:0.10},
+      duplicate:{frequency:900,duration:0.11,wave:'sine',volume:0.17},
+      invalid:{frequency:293.7,duration:0.30,wave:'sine',volume:0.18},
+      error:{frequency:392,duration:0.28,wave:'sine',volume:0.18}
     };
     const sound=sounds[type]||sounds.success;
-    const now=scannerAudioContext.currentTime;
-    const oscillator=scannerAudioContext.createOscillator();
-    const gain=scannerAudioContext.createGain();
-
-    oscillator.type='sine';
-    oscillator.frequency.setValueAtTime(sound.frequency,now);
-    gain.gain.setValueAtTime(0.0001,now);
-    gain.gain.exponentialRampToValueAtTime(0.18,now+0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001,now+sound.duration);
-
-    oscillator.connect(gain);
-    gain.connect(scannerAudioContext.destination);
-    oscillator.start(now);
-    oscillator.stop(now+sound.duration+0.02);
+    const ctx=scannerAudioContext;
+    const beep=(start)=>{
+      const oscillator=ctx.createOscillator();
+      const gain=ctx.createGain();
+      oscillator.type=sound.wave;
+      oscillator.frequency.setValueAtTime(sound.frequency,start);
+      gain.gain.setValueAtTime(0.0001,start);
+      gain.gain.exponentialRampToValueAtTime(sound.volume,start+0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001,start+sound.duration);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(start);
+      oscillator.stop(start+sound.duration+0.02);
+      oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};
+    };
+    const now=ctx.currentTime+0.01;
+    beep(now);
+    if(type==='duplicate')beep(now+0.18);
   }catch(err){
     console.warn('[ICC] Could not play scanner sound:',err);
   }
@@ -579,6 +584,14 @@ async function stopScan(){
 
   buttons();
 }
+
+el('testBeep').addEventListener('click',async()=>{
+  unlockScannerAudio();
+  if(scannerAudioContext&&scannerAudioContext.state==='suspended'){
+    try{await scannerAudioContext.resume();}catch(_){}
+  }
+  playScannerSound('success');
+});
 
 el('start').addEventListener('click',startScan);
 el('stop').addEventListener('click',stopScan);
