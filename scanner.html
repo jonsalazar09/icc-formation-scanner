@@ -148,6 +148,52 @@ let requestSequence=0;
 let completedScans=0;
 let photoStartedAt=0;
 
+// Audio is initialized from a volunteer's tap so mobile browsers allow playback.
+let scannerAudioContext=null;
+
+function unlockScannerAudio(){
+  try{
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+    if(!AudioContextClass)return;
+    if(!scannerAudioContext)scannerAudioContext=new AudioContextClass();
+    if(scannerAudioContext.state==='suspended'){
+      scannerAudioContext.resume().catch(()=>{});
+    }
+  }catch(err){
+    console.warn('[ICC] Scanner audio unavailable:',err);
+  }
+}
+
+function playScannerSound(type='success'){
+  try{
+    if(!scannerAudioContext||scannerAudioContext.state!=='running')return;
+
+    const sounds={
+      success:{frequency:1046.5,duration:0.16},
+      duplicate:{frequency:659.3,duration:0.22},
+      invalid:{frequency:293.7,duration:0.30},
+      error:{frequency:392,duration:0.28}
+    };
+    const sound=sounds[type]||sounds.success;
+    const now=scannerAudioContext.currentTime;
+    const oscillator=scannerAudioContext.createOscillator();
+    const gain=scannerAudioContext.createGain();
+
+    oscillator.type='sine';
+    oscillator.frequency.setValueAtTime(sound.frequency,now);
+    gain.gain.setValueAtTime(0.0001,now);
+    gain.gain.exponentialRampToValueAtTime(0.18,now+0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001,now+sound.duration);
+
+    oscillator.connect(gain);
+    gain.connect(scannerAudioContext.destination);
+    oscillator.start(now);
+    oscillator.stop(now+sound.duration+0.02);
+  }catch(err){
+    console.warn('[ICC] Could not play scanner sound:',err);
+  }
+}
+
 function show(message,cls=''){
   el('result').className=cls;
   el('result').textContent=message;
@@ -312,6 +358,7 @@ function finishRequest(req,data){
   }
 
   if(success){
+    playScannerSound('success');
     show(
       '✓ '+actionLabel+' SUCCESSFUL\n'+
       (r.name||'Participant: '+req.registrationId)+
@@ -320,6 +367,7 @@ function finishRequest(req,data){
       'ok'
     );
   }else if(duplicate){
+    playScannerSound('duplicate');
     show(
       '! '+(mode==='checkout'?'ALREADY CHECKED OUT':'ALREADY CHECKED IN')+'\n'+
       (r.name||'Participant: '+req.registrationId)+
@@ -327,6 +375,7 @@ function finishRequest(req,data){
       'warn'
     );
   }else{
+    playScannerSound('error');
     show(
       '✕ '+actionLabel+' NOT COMPLETED\n'+
       (r.name||'Participant: '+req.registrationId)+
@@ -385,6 +434,7 @@ function submitAttendance(raw,isRetry=false,retryAttempt=0){
   const id=parseId(raw);
 
   if(!id){
+    playScannerSound('invalid');
     show('Invalid QR or registration ID. Expected ICC26-00001 format.','bad');
     return;
   }
@@ -461,6 +511,7 @@ function submitAttendance(raw,isRetry=false,retryAttempt=0){
 async function startScan(){
   if(starting||scanning)return;
 
+  unlockScannerAudio();
   starting=true;
   buttons();
   show('Requesting camera access…','info');
@@ -533,12 +584,14 @@ el('start').addEventListener('click',startScan);
 el('stop').addEventListener('click',stopScan);
 
 el('submit').addEventListener('click',()=>{
+  unlockScannerAudio();
   submitAttendance(el('manual').value);
 });
 
 el('manual').addEventListener('keydown',e=>{
   if(e.key==='Enter'){
     e.preventDefault();
+    unlockScannerAudio();
     submitAttendance(el('manual').value);
   }
 });
