@@ -107,7 +107,8 @@ small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
   <button id="start" type="button">Start Camera</button>
   <button id="stop" type="button" class="secondary" disabled>Pause Camera</button>
 </div>
-<button id="testBeep" type="button" class="light" style="margin-top:9px;min-height:42px">🔊 Test High-Pitched Beep</button>
+<button id="testBeep" type="button" class="light" style="margin-top:9px;min-height:42px">🎵 Test Check-In Chime</button>
+<button id="testCheckoutBell" type="button" class="light" style="margin-top:9px;min-height:42px">🔔 Test Check-Out Bell</button>
 
 <section class="manual">
   <div class="manual-title">MANUAL REGISTRATION ID</div>
@@ -165,35 +166,56 @@ function unlockScannerAudio(){
   }
 }
 
-function playScannerSound(type='success'){
+function playScannerSound(type='checkin'){
   try{
     if(!scannerAudioContext||scannerAudioContext.state!=='running')return;
-
-    const sounds={
-      success:{frequency:2200,duration:0.12,wave:'square',volume:0.10},
-      duplicate:{frequency:900,duration:0.11,wave:'sine',volume:0.17},
-      invalid:{frequency:293.7,duration:0.30,wave:'sine',volume:0.18},
-      error:{frequency:392,duration:0.28,wave:'sine',volume:0.18}
-    };
-    const sound=sounds[type]||sounds.success;
     const ctx=scannerAudioContext;
-    const beep=(start)=>{
+    const now=ctx.currentTime+0.01;
+
+    function tone(frequency,start,duration,volume=0.12,wave='sine',endFrequency=null){
       const oscillator=ctx.createOscillator();
       const gain=ctx.createGain();
-      oscillator.type=sound.wave;
-      oscillator.frequency.setValueAtTime(sound.frequency,start);
+      oscillator.type=wave;
+      oscillator.frequency.setValueAtTime(frequency,start);
+      if(endFrequency!==null){
+        oscillator.frequency.exponentialRampToValueAtTime(endFrequency,start+duration);
+      }
       gain.gain.setValueAtTime(0.0001,start);
-      gain.gain.exponentialRampToValueAtTime(sound.volume,start+0.012);
-      gain.gain.exponentialRampToValueAtTime(0.0001,start+sound.duration);
+      gain.gain.exponentialRampToValueAtTime(volume,start+0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001,start+duration);
       oscillator.connect(gain);
       gain.connect(ctx.destination);
       oscillator.start(start);
-      oscillator.stop(start+sound.duration+0.02);
+      oscillator.stop(start+duration+0.02);
       oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};
-    };
-    const now=ctx.currentTime+0.01;
-    beep(now);
-    if(type==='duplicate')beep(now+0.18);
+    }
+    function bell(frequency,start,duration){
+      tone(frequency,start,duration,0.12);
+      tone(frequency*2.01,start,duration*0.65,0.032);
+      tone(frequency*3.92,start,duration*0.32,0.012);
+    }
+
+    switch(type){
+      case 'success': // Compatibility with older test calls.
+      case 'checkin':
+        bell(880,now,0.23);
+        bell(1318.5,now+0.17,0.38);
+        break;
+      case 'checkout':
+        bell(1046.5,now,0.48);
+        break;
+      case 'duplicate':
+        tone(440,now,0.12,0.16);
+        tone(440,now+0.19,0.12,0.16);
+        break;
+      case 'invalid':
+        tone(740,now,0.28,0.16,'sine',330);
+        break;
+      case 'error':
+      default:
+        tone(392,now,0.55,0.18,'triangle',310);
+        break;
+    }
   }catch(err){
     console.warn('[ICC] Could not play scanner sound:',err);
   }
@@ -363,7 +385,7 @@ function finishRequest(req,data){
   }
 
   if(success){
-    playScannerSound('success');
+    playScannerSound(mode==='checkout'?'checkout':'checkin');
     show(
       '✓ '+actionLabel+' SUCCESSFUL\n'+
       (r.name||'Participant: '+req.registrationId)+
@@ -420,6 +442,7 @@ function uncertain(req,reason){
   pending=null;
   busy=false;
   uncertainId=req.registrationId;
+  playScannerSound('error');
 
   show(
     reason+
@@ -590,7 +613,12 @@ el('testBeep').addEventListener('click',async()=>{
   if(scannerAudioContext&&scannerAudioContext.state==='suspended'){
     try{await scannerAudioContext.resume();}catch(_){}
   }
-  playScannerSound('success');
+  playScannerSound('checkin');
+});
+
+el('testCheckoutBell').addEventListener('click',()=>{
+  unlockScannerAudio();
+  playScannerSound('checkout');
 });
 
 el('start').addEventListener('click',startScan);
