@@ -118,7 +118,7 @@ small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
 
 <section id="verify" aria-live="polite">
   <strong>Confirmation not received</strong>
-  <p>The request may have been recorded, but the scanner did not receive its confirmation. Check the Attendance Log before retrying this ID.</p>
+  <p>The request may have been recorded, but the scanner did not receive its confirmation. Check Master Registration (and the Attendance Log) before retrying this ID.</p>
   <button id="verifyButton" type="button">I've checked the log — try again</button>
 </section>
 
@@ -229,8 +229,8 @@ function show(message,cls=''){
 }
 
 function buttons(){
-  el('start').disabled=starting||scanning;
-  el('stop').disabled=!scanning||starting;
+  el('start').disabled=starting||scanning||busy||Boolean(uncertainId);
+  el('stop').disabled=!scanning||starting||busy;
   el('submit').disabled=busy||Boolean(uncertainId);
 }
 
@@ -364,12 +364,23 @@ function finishRequest(req,data){
 
   // retry:true means the server did not acquire its lock, so this attempt was not run.
   // Never auto-retry an uncertain timeout or network error.
-  if(r.retry===true && req.retryAttempt<2){
-    busy=false;
-    show('The attendance service is busy. Retrying safely…','info');
+  if(r.retry===true){
+    if(req.retryAttempt<3){
+      busy=true;
+      const nextAttempt=req.retryAttempt+1;
+      const delay=Math.round((2000*Math.pow(2,nextAttempt-1))*(1+Math.random()*0.5));
+      show('System temporarily busy.\nRetry '+nextAttempt+' of 3 in '+Math.ceil(delay/1000)+' seconds.\nPlease do not rescan.','warn');
+      buttons();
+      setTimeout(()=>{
+        busy=false;
+        submitAttendance(req.registrationId,true,nextAttempt);
+      },delay);
+      return;
+    }
+    clearParticipant();
+    playScannerSound('error');
+    show('System still busy after 3 retries.\nRegistration ID: '+req.registrationId+'\nAttendance was not recorded by these attempts. Refer participant to registration support or retry when traffic clears.','bad');
     buttons();
-    const nextAttempt=req.retryAttempt+1;
-    setTimeout(()=>submitAttendance(req.registrationId,true,nextAttempt),350*nextAttempt);
     return;
   }
 
@@ -449,7 +460,7 @@ function uncertain(req,reason){
   show(
     reason+
     '\nRegistration ID: '+req.registrationId+
-    '\nCheck the Attendance Log before trying this ID again.',
+    '\nCheck Master Registration (and the Attendance Log) before trying this ID again.',
     'bad'
   );
 
@@ -539,7 +550,7 @@ function submitAttendance(raw,isRetry=false,retryAttempt=0){
 }
 
 async function startScan(){
-  if(starting||scanning)return;
+  if(starting||scanning||busy||uncertainId)return;
 
   unlockScannerAudio();
   starting=true;
@@ -594,7 +605,7 @@ async function startScan(){
 }
 
 async function stopScan(){
-  if(!qr||!scanning)return;
+  if(!qr||!scanning||busy)return;
 
   try{
     await qr.stop();
@@ -633,7 +644,7 @@ el('verifyButton').addEventListener('click',()=>{
 
   const id=uncertainId;
   const confirmed=window.confirm(
-    'Only continue if you have checked the Attendance Log and confirmed '+
+    'Only continue if you have checked Master Registration and confirmed '+
     id+' was NOT recorded. Retry this registration ID?'
   );
 
