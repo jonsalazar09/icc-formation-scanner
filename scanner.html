@@ -38,15 +38,10 @@ a{color:inherit}
 #result.bad{background:var(--redbg);color:#842323;border-color:#f1c0c0}
 #result.info{background:#edf2fa;color:#2b4267;border-color:#d5e0f1}
 #participant{display:none;padding:14px;margin-top:10px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 3px 12px #3510210a}
-#participant.visible{display:grid;grid-template-columns:92px minmax(0,1fr);gap:12px;align-items:center;text-align:left}
-#participantPhoto{display:none;width:92px;height:112px;object-fit:cover;border-radius:11px;border:2px solid #eadfe5;margin:0}
-#participantPhoto.visible{display:block}
-#photoPlaceholder{display:flex;width:92px;height:112px;margin:0;border-radius:11px;align-items:center;justify-content:center;text-align:center;padding:8px;background:#f3eff1;color:#777;font-size:11px}
-#photoPlaceholder.hidden{display:none}
+#participant.visible{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:center;text-align:left}
 #participantName{font-size:18px;font-weight:800;color:var(--wine);line-height:1.2;overflow-wrap:anywhere}
 #participantId{font-size:12px;color:#74717a;margin-top:4px}
 #participantChoir{font-size:14px;font-weight:700;color:var(--navy);margin-top:7px;overflow-wrap:anywhere}
-#photoNote{font-size:11px;color:#777;margin-top:5px}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
 button{width:100%;min-height:48px;padding:12px 10px;border:0;border-radius:12px;background:var(--wine);color:#fff;font-size:14px;font-weight:750;cursor:pointer;touch-action:manipulation}
 button.secondary{background:var(--navy)}
@@ -62,7 +57,7 @@ input{width:100%;min-width:0;font-size:16px;padding:12px;border-radius:10px;bord
 #verify button{margin-top:8px}
 small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
 .footer-note{text-align:center;padding:10px 4px 0}
-@media(max-width:360px){main{padding-left:10px;padding-right:10px}.actions{grid-template-columns:1fr}.manual-row{grid-template-columns:minmax(0,1fr) 88px}#participant.visible{grid-template-columns:78px minmax(0,1fr)}#participantPhoto,#photoPlaceholder{width:78px;height:100px}#participantName{font-size:16px}}
+@media(max-width:360px){main{padding-left:10px;padding-right:10px}.actions{grid-template-columns:1fr}.manual-row{grid-template-columns:minmax(0,1fr) 88px}#participantName{font-size:16px}}
 </style>
 
 </head>
@@ -93,13 +88,10 @@ small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
 <div id="result" role="status" aria-live="polite">Ready to scan. Tap Start Camera when you're ready.</div>
 
 <section id="participant" aria-live="polite">
-  <img id="participantPhoto" alt="Participant identification photo">
-  <div id="photoPlaceholder">Participant photo</div>
   <div>
     <div id="participantName"></div>
     <div id="participantId"></div>
     <div id="participantChoir"></div>
-    <div id="photoNote"></div>
   </div>
 </section>
 
@@ -146,7 +138,6 @@ let lastAt=0;
 let uncertainId='';
 let requestSequence=0;
 let completedScans=0;
-let photoStartedAt=0;
 
 // Audio is initialized from a volunteer's tap so mobile browsers allow playback.
 let scannerAudioContext=null;
@@ -255,95 +246,18 @@ function resumeCamera(){
 
 function clearParticipant(){
   el('participant').classList.remove('visible');
-  const oldPhoto=el('participantPhoto');
-  oldPhoto.onload=null;
-  oldPhoto.onerror=null;
-  oldPhoto.classList.remove('visible');
-  oldPhoto.removeAttribute('src');
-  el('photoPlaceholder').classList.remove('hidden');
   el('participantName').textContent='';
   el('participantId').textContent='';
   el('participantChoir').textContent='';
-  el('photoNote').textContent='';
 }
 
 function displayParticipant(r,registrationId){
-  const panel=el('participant');
-  const photo=el('participantPhoto');
-  const placeholder=el('photoPlaceholder');
-
-  panel.classList.add('visible');
+  el('participant').classList.add('visible');
   el('participantName').textContent=r.name||'Registered Participant';
   el('participantId').textContent=registrationId||'';
   const choir=String(r.choir||r.choirName||'').trim();
   el('participantChoir').textContent=choir||'Choir not available';
-
-  const photoUrl=typeof r.photoDataUrl==='string'?r.photoDataUrl:'';
-
-  if(photoUrl.startsWith('data:image/')){
-    photo.onload=()=>{
-      photo.classList.add('visible');
-      placeholder.classList.add('hidden');
-      el('photoNote').textContent='';
-    };
-
-    photo.onerror=()=>{
-      photo.classList.remove('visible');
-      photo.removeAttribute('src');
-      placeholder.classList.remove('hidden');
-      el('photoNote').textContent='The participant photo could not be displayed.';
-    };
-
-    photo.src=photoUrl;
-  }else{
-    photo.classList.remove('visible');
-    photo.removeAttribute('src');
-    placeholder.classList.remove('hidden');
-    el('photoNote').textContent=
-      r.photoMessage||'No uploaded photo was found for this participant.';
-  }
 }
-
-
-// Photo retrieval is deliberately independent of the attendance transaction.
-// A slow photo must never keep the scanner busy or block the next participant.
-let photoPending=null;
-let activePhotoRequest='';
-function loadPhoto(id, attendanceRequestId){
-  if(photoPending){clearTimeout(photoPending.timeout);photoPending.script.remove();photoPending=null;}
-  const requestId='photo_'+Date.now()+'_'+(++requestSequence);
-  const script=document.createElement('script');
-  const req={id:requestId,registrationId:id,script,timeout:null};
-  photoPending=req;
-  activePhotoRequest=requestId;
-  el('photoNote').textContent='Loading participant photo…';
-  script.src=ENDPOINT+'?'+new URLSearchParams({action:'photo',registrationId:id,requestId}).toString();
-  function fallback(message){
-    if(photoPending!==req)return;
-    clearTimeout(req.timeout);script.remove();photoPending=null;
-    if(activePhotoRequest!==requestId)return;
-    el('photoNote').textContent=message;
-  }
-  req.timeout=setTimeout(()=>fallback('Photo timed out. Attendance is recorded.'),12000);
-  script.onerror=()=>fallback('Photo unavailable. Attendance is recorded.');
-  document.head.appendChild(script);
-}
-window.iccReceivePhoto=function(data){
-  if(!photoPending||!data||data.requestId!==photoPending.id)return;
-  const req=photoPending;
-  clearTimeout(req.timeout);req.script.remove();photoPending=null;
-  if(activePhotoRequest!==req.id || el('participantId').textContent!==req.registrationId)return;
-  const r=data.result||{};
-  const photo=el('participantPhoto');
-  const placeholder=el('photoPlaceholder');
-  if(typeof r.photoDataUrl==='string'&&r.photoDataUrl.startsWith('data:image/')){
-    photo.onload=()=>{photo.classList.add('visible');placeholder.classList.add('hidden');el('photoNote').textContent='';};
-    photo.onerror=()=>{photo.classList.remove('visible');photo.removeAttribute('src');placeholder.classList.remove('hidden');el('photoNote').textContent='Photo could not be displayed.';};
-    photo.src=r.photoDataUrl;
-  }else{
-    el('photoNote').textContent=r.photoMessage||'No uploaded photo was found.';
-  }
-};
 
 function finishRequest(req,data){
   if(!pending||pending.id!==req.id)return;
@@ -390,7 +304,7 @@ function finishRequest(req,data){
   const mode=req.mode;
   const actionLabel=mode==='checkout'?'CHECK-OUT':'CHECK-IN';
 
-  if(r.name||r.choir||r.choirName||r.photoDataUrl||r.photoMessage||success||duplicate){
+  if(r.name||r.choir||r.choirName||success||duplicate){
     displayParticipant(r,req.registrationId);
 
   }else{
@@ -430,17 +344,7 @@ function finishRequest(req,data){
 
 function receiveResult(data){
   if(!data||!pending||data.requestId!==pending.id)return;
-  const req=pending;
-  const r=data.result||{};
-  const duplicate=r.duplicate===true||/already\s+check(?:ed)?[\s-]*(?:in|out)|previously\s+check(?:ed)?[\s-]*(?:in|out)|duplicate|already\s+(?:registered|scanned)/i.test(String(r.message||''));
-  if((r.ok===true||duplicate)&&!Object.prototype.hasOwnProperty.call(r,'photoDataUrl')&&
-     !Object.prototype.hasOwnProperty.call(r,'photoMessage')){
-    // Confirm attendance and release the scanner first; photo lookup runs in the background.
-    finishRequest(req,{result:r});
-    if(r.ok===true||duplicate)loadPhoto(req.registrationId,req.id);
-    return;
-  }
-  finishRequest(req,data);
+  finishRequest(pending,data);
 }
 
 window.iccReceiveCheckIn=receiveResult;
@@ -501,8 +405,6 @@ function submitAttendance(raw,isRetry=false,retryAttempt=0){
     try{qr.pause(true);}catch(_){}
   }
 
-  if(photoPending){clearTimeout(photoPending.timeout);photoPending.script.remove();photoPending=null;}
-  activePhotoRequest='';
   clearParticipant();
   el('verify').classList.remove('visible');
   show('Sending '+(el('mode').value==='checkout'?'check-out':'check-in')+' request for '+id+'…','info');
