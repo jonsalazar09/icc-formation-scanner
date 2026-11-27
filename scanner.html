@@ -100,7 +100,6 @@ small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
   <button id="stop" type="button" class="secondary" disabled>Pause Camera</button>
 </div>
 
-<button id="testSound" type="button" class="light" style="margin-top:9px">Test Loud Sound</button>
 <section class="manual">
   <div class="manual-title">MANUAL REGISTRATION ID</div>
   <div class="manual-row">
@@ -519,7 +518,6 @@ async function stopScan(){
   buttons();
 }
 
-el('testSound').addEventListener('click',()=>{unlockScannerAudio();playScannerSound('checkin');});
 el('start').addEventListener('click',startScan);
 el('stop').addEventListener('click',stopScan);
 
