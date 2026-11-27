@@ -100,6 +100,7 @@ small{display:block;color:#777;margin-top:13px;line-height:1.45;font-size:11px}
   <button id="stop" type="button" class="secondary" disabled>Pause Camera</button>
 </div>
 
+<button id="testSound" type="button" class="light" style="margin-top:9px">Test Loud Sound</button>
 <section class="manual">
   <div class="manual-title">MANUAL REGISTRATION ID</div>
   <div class="manual-row">
@@ -182,31 +183,26 @@ function playScannerSound(type='checkin'){
       oscillator.stop(start+duration+0.02);
       oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};
     }
-    function bell(frequency,start,duration){
-      tone(frequency,start,duration,0.12);
-      tone(frequency*2.01,start,duration*0.65,0.032);
-      tone(frequency*3.92,start,duration*0.32,0.012);
-    }
-
     switch(type){
-      case 'success': // Compatibility with older test calls.
+      case 'success':
       case 'checkin':
-        bell(880,now,0.23);
-        bell(1318.5,now+0.17,0.38);
+        tone(1100,now,0.22,0.75,'triangle');
+        tone(1600,now+0.28,0.32,0.75,'triangle');
         break;
       case 'checkout':
-        bell(1046.5,now,0.48);
+        tone(1450,now,0.22,0.75,'triangle');
+        tone(950,now+0.28,0.32,0.75,'triangle');
         break;
       case 'duplicate':
-        tone(440,now,0.12,0.16);
-        tone(440,now+0.19,0.12,0.16);
+        for(let i=0;i<3;i++) tone(700,now+i*0.23,0.16,0.75,'triangle');
         break;
       case 'invalid':
-        tone(740,now,0.28,0.16,'sine',330);
+        tone(550,now,0.65,0.75,'triangle',350);
         break;
       case 'error':
       default:
-        tone(392,now,0.55,0.18,'triangle',310);
+        tone(600,now,0.38,0.75,'triangle');
+        tone(600,now+0.48,0.38,0.75,'triangle');
         break;
     }
   }catch(err){
@@ -523,6 +519,7 @@ async function stopScan(){
   buttons();
 }
 
+el('testSound').addEventListener('click',()=>{unlockScannerAudio();playScannerSound('checkin');});
 el('start').addEventListener('click',startScan);
 el('stop').addEventListener('click',stopScan);
 
