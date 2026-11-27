@@ -535,7 +535,7 @@ function submitAttendance(raw,isRetry=false,retryAttempt=0){
       req,
       'No confirmation was received before the request timed out.'
     );
-  },30000);
+  },60000);
 
   script.onerror=()=>{
     uncertain(
